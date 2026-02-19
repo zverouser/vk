@@ -1,84 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Запись в фитнес-клуб</title>
-    
-    <!-- VK Bridge - обязателен для работы в ВК -->
-    <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
-    
-    <style>
-        /* Простые стили для правильного отображения */
-        body {
-            margin: 0;
-            padding: 0;
-            background: #ebedf0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        #widget-container {
-            width: 100%;
-            min-height: 100vh;
-        }
-        /* Исправляем возможные проблемы с виджетом */
-        .fit-widget-container,
-        [class*="fit-"] {
-            max-width: 100% !important;
-        }
-    </style>
+    <title>Тест</title>
 </head>
 <body>
-    <!-- Контейнер, куда загрузится виджет -->
-    <div id="widget-container"></div>
-
+    <h1 style="color: green; text-align: center;">ЕСЛИ ВЫ ЭТО ВИДИТЕ - HTML РАБОТАЕТ</h1>
+    <p style="text-align: center;">А это просто текст для проверки.</p>
     <script>
-        // 1. Обязательно инициализируем VK Bridge
-        vkBridge.send('VKWebAppInit');
-        
-        // 2. Небольшая задержка для гарантии загрузки VK Bridge
-        setTimeout(() => {
-            // 3. Получаем информацию о пользователе (необязательно, но полезно)
-            vkBridge.send('VKWebAppGetUserInfo')
-                .then(user => {
-                    console.log('Пользователь ВК:', user);
-                })
-                .catch(() => {
-                    console.log('Не в ВК или нет доступа');
-                });
-        }, 100);
-
-        // 4. ВАШ СКРИПТ - загружаем виджет Reservi
-        function loadReserviWidget() {
-            const script = document.createElement('script');
-            
-            // Основные параметры
-            script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
-            script.setAttribute('data-fit-apikey', '42e1e4d1-499e-4154-a343-c50637c858c5');
-            script.setAttribute('data-type', 'schedule');
-            script.setAttribute('data-theme', 'light');
-            
-            // НАСТРОЙКИ - ВАЖНО: исправленный club_id
-            const settings = {
-                url_data: {
-                    club_id: '76f052aa-70d0-11ef-9cd6-00505683c1c3'  // БЫЛО a3, СТАЛО c3
-                },
-                container: '#widget-container'  // указываем, куда загружать
-            };
-            
-            script.setAttribute('data-settings', JSON.stringify(settings));
-            
-            // Добавляем скрипт на страницу
-            document.head.appendChild(script);
-            
-            console.log('Виджет Reservi загружается...');
-        }
-
-        // Запускаем загрузку виджета после полной загрузки страницы
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadReserviWidget);
-        } else {
-            loadReserviWidget();
-        }
+        console.log("Скрипт выполнен!");
+        alert("Скрипт работает и показывает alert!");
     </script>
 </body>
 </html>
