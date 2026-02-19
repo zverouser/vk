@@ -5,75 +5,80 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Запись в фитнес-клуб</title>
     
-    <!-- Подключаем VK Bridge (это для связи с ВКонтакте) -->
+    <!-- VK Bridge - обязателен для работы в ВК -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
     
-    <!-- Базовые стили -->
     <style>
+        /* Простые стили для правильного отображения */
         body {
             margin: 0;
             padding: 0;
+            background: #ebedf0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
         }
-        #app {
-            max-width: 100%;
-            margin: 0 auto;
+        #widget-container {
+            width: 100%;
+            min-height: 100vh;
+        }
+        /* Исправляем возможные проблемы с виджетом */
+        .fit-widget-container,
+        [class*="fit-"] {
+            max-width: 100% !important;
         }
     </style>
 </head>
 <body>
-    <div id="app">
-        <!-- СЮДА ЗАГРУЗИТСЯ ВАШ ВИДЖЕТ -->
-        <div id="reservi-widget"></div>
-    </div>
+    <!-- Контейнер, куда загрузится виджет -->
+    <div id="widget-container"></div>
 
     <script>
-        // Инициализация VK Bridge (обязательно для работы в ВК)
+        // 1. Обязательно инициализируем VK Bridge
         vkBridge.send('VKWebAppInit');
         
-        // Получаем информацию о пользователе (для статистики)
-        vkBridge.send('VKWebAppGetUserInfo')
-            .then(user => {
-                console.log('Пользователь зашел:', user);
-            })
-            .catch(error => {
-                console.log('Не удалось получить данные пользователя');
-            });
+        // 2. Небольшая задержка для гарантии загрузки VK Bridge
+        setTimeout(() => {
+            // 3. Получаем информацию о пользователе (необязательно, но полезно)
+            vkBridge.send('VKWebAppGetUserInfo')
+                .then(user => {
+                    console.log('Пользователь ВК:', user);
+                })
+                .catch(() => {
+                    console.log('Не в ВК или нет доступа');
+                });
+        }, 100);
 
-        // СОЗДАЕМ СКРИПТ ДЛЯ ВАШЕГО ВИДЖЕТА
+        // 4. ВАШ СКРИПТ - загружаем виджет Reservi
         function loadReserviWidget() {
-            // Создаем тег <script>
             const script = document.createElement('script');
             
-            // Указываем адрес скрипта Reservi.ru
+            // Основные параметры
             script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
-            
-            // Добавляем ваш API ключ
             script.setAttribute('data-fit-apikey', '42e1e4d1-499e-4154-a343-c50637c858c5');
-            
-            // Указываем тип - расписание
             script.setAttribute('data-type', 'schedule');
-            
-            // Тема - светлая
             script.setAttribute('data-theme', 'light');
             
-            // Настройки с club_id (ваш клуб)
-            script.setAttribute('data-settings', JSON.stringify({
+            // НАСТРОЙКИ - ВАЖНО: исправленный club_id
+            const settings = {
                 url_data: {
-                    club_id: '76f052aa-70d0-11ef-9cd6-00505683c1c3'
+                    club_id: '76f052aa-70d0-11ef-9cd6-00505683c1c3'  // БЫЛО a3, СТАЛО c3
                 },
-                container: '#reservi-widget'  // куда загружать виджет
-            }));
+                container: '#widget-container'  // указываем, куда загружать
+            };
+            
+            script.setAttribute('data-settings', JSON.stringify(settings));
             
             // Добавляем скрипт на страницу
             document.head.appendChild(script);
             
-            console.log('Виджет Reservi.ru загружается...');
+            console.log('Виджет Reservi загружается...');
         }
 
-        // Запускаем загрузку виджета, когда страница готова
-        document.addEventListener('DOMContentLoaded', loadReserviWidget);
+        // Запускаем загрузку виджета после полной загрузки страницы
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadReserviWidget);
+        } else {
+            loadReserviWidget();
+        }
     </script>
 </body>
 </html>
