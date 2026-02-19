@@ -1,38 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Тест виджета Reservi</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Запись в фитнес-клуб</title>
+    
+    <!-- 1. Подключаем VK Bridge (обязательно для VK Mini App) -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
+    
     <style>
-        body { margin: 0; padding: 20px; font-family: Arial; }
-        #fit-widget { min-height: 500px; border: 1px solid red; }
+        body { margin: 0; padding: 0; background: #f5f5f5; }
+        /* Визуальный маркер, чтобы видеть, что страница загрузилась */
+        #status-marker { 
+            position: fixed; bottom: 10px; right: 10px; 
+            background: green; color: white; padding: 5px; 
+            font-size: 12px; border-radius: 3px; z-index: 9999;
+        }
     </style>
 </head>
 <body>
-    <h2>Тест виджета</h2>
-    <div id="fit-widget"></div>
+    <!-- Визуальный маркер -->
+    <div id="status-marker">✅ Страница загружена</div>
 
+    <!-- 2. ВАШ ОРИГИНАЛЬНЫЙ РАБОЧИЙ СКРИПТ -->
+    <!--    Вставлен прямо в тело страницы, как в вашем TMA -->
+    <script src="https://reservi.ru/widget-fit1c.v4/public/init.js" 
+            data-fit-apikey="42e1e4d1-499e-4154-a343-c50637c858c5" 
+            data-type="schedule" 
+            data-theme='light' 
+            data-settings='{
+                "url_data": {
+                    "club_id": "76f052aa-70d0-11ef-9cd6-00505683c1a3"
+                }
+            }'>
+    </script>
+
+    <!-- 3. Инициализация VK Bridge -->
     <script>
-        // Создаем элемент с data-атрибутами
-        const widgetDiv = document.getElementById('fit-widget');
-        widgetDiv.setAttribute('data-fit-apikey', 'b137fb54-9705-4a88-8738-f1422ad91289');
-        widgetDiv.setAttribute('data-type', 'schedule');
-        widgetDiv.setAttribute('data-theme', 'light');
-        widgetDiv.setAttribute('data-settings', JSON.stringify({
-            url_data: {
-                page: "schedule",
-                type: "rent",
-                club_id: "f1c7788a-557e-11f0-910a-00505683cb0f",
-                show_type: "day",
-                rent_default_view: "services"
-            }
-        }));
-
-        // Загружаем скрипт
-        const script = document.createElement('script');
-        script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
-        document.head.appendChild(script);
-        
-        console.log('Скрипт загружается...');
+        // Эта функция выполнится после полной загрузки страницы
+        window.onload = function() {
+            // Сообщаем VK, что приложение инициализировано
+            vkBridge.send('VKWebAppInit');
+            console.log('VK Bridge инициализирован');
+            
+            // Меняем текст маркера для подтверждения
+            document.getElementById('status-marker').innerHTML = '✅ VK Bridge запущен';
+        };
     </script>
 </body>
 </html>
