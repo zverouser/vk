@@ -2,25 +2,37 @@
 <html>
 <head>
     <title>Тест виджета Reservi</title>
+    <style>
+        body { margin: 0; padding: 20px; font-family: Arial; }
+        #fit-widget { min-height: 500px; border: 1px solid red; }
+    </style>
 </head>
 <body>
-    <!-- Минимальный код виджета -->
-    <div data-fit-apikey="b137fb54-9705-4a88-8738-f1422ad91289" 
-         data-type="schedule" 
-         data-theme="light" 
-         data-settings='{
-             "url_data": {
-                 "page": "schedule",
-                 "type": "rent",
-                 "club_id": "f1c7788a-557e-11f0-910a-00505683cb0f",
-                 "show_type": "day",
-                 "rent_default_view": "services"
-             }
-         }'>
-    </div>
+    <h2>Тест виджета</h2>
+    <div id="fit-widget"></div>
 
-    <script src="https://reservi.ru/widget-fit1c.v4/public/init.js"></script>
-    
-    <h1 style="text-align: center; margin-top: 50px;">Если вы видите этот текст, HTML работает, а виджет нет</h1>
+    <script>
+        // Создаем элемент с data-атрибутами
+        const widgetDiv = document.getElementById('fit-widget');
+        widgetDiv.setAttribute('data-fit-apikey', 'b137fb54-9705-4a88-8738-f1422ad91289');
+        widgetDiv.setAttribute('data-type', 'schedule');
+        widgetDiv.setAttribute('data-theme', 'light');
+        widgetDiv.setAttribute('data-settings', JSON.stringify({
+            url_data: {
+                page: "schedule",
+                type: "rent",
+                club_id: "f1c7788a-557e-11f0-910a-00505683cb0f",
+                show_type: "day",
+                rent_default_view: "services"
+            }
+        }));
+
+        // Загружаем скрипт
+        const script = document.createElement('script');
+        script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
+        document.head.appendChild(script);
+        
+        console.log('Скрипт загружается...');
+    </script>
 </body>
 </html>
