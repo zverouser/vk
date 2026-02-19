@@ -1,144 +1,79 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Расписание занятий</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Запись в фитнес-клуб</title>
     
-    <!-- Подключаем VK Bridge для работы с VK -->
+    <!-- Подключаем VK Bridge (это для связи с ВКонтакте) -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
     
-    <!-- Базовые стили для мобильной версии -->
+    <!-- Базовые стили -->
     <style>
-        * {
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #f5f5f5;
-            min-height: 100vh;
         }
-        
         #app {
-            width: 100%;
-            min-height: 100vh;
-            padding: 0;
-            margin: 0;
-        }
-        
-        /* Стили для адаптации виджета */
-        .fit-widget-container {
-            width: 100% !important;
-            max-width: 100% !important;
-            padding: 0 !important;
-            margin: 0 !important;
-        }
-        
-        /* Исправляем возможные проблемы с iframe */
-        iframe {
-            max-width: 100% !important;
-            border: none !important;
+            max-width: 100%;
+            margin: 0 auto;
         }
     </style>
 </head>
 <body>
     <div id="app">
-        <!-- Контейнер для виджета -->
-        <div id="schedule-widget"></div>
+        <!-- СЮДА ЗАГРУЗИТСЯ ВАШ ВИДЖЕТ -->
+        <div id="reservi-widget"></div>
     </div>
 
     <script>
-        // Инициализация VK Mini App
+        // Инициализация VK Bridge (обязательно для работы в ВК)
         vkBridge.send('VKWebAppInit');
         
-        // Функция для обновления темы в зависимости от настроек VK
-        function updateTheme() {
-            vkBridge.send('VKWebAppGetConfig')
-                .then(data => {
-                    if (data.appearance === 'dark') {
-                        document.documentElement.style.backgroundColor = '#19191a';
-                        document.body.style.backgroundColor = '#19191a';
-                    }
-                })
-                .catch(() => {
-                    // Игнорируем ошибку, используем тему по умолчанию
-                });
-        }
-        
-        // Загружаем тему
-        updateTheme();
+        // Получаем информацию о пользователе (для статистики)
+        vkBridge.send('VKWebAppGetUserInfo')
+            .then(user => {
+                console.log('Пользователь зашел:', user);
+            })
+            .catch(error => {
+                console.log('Не удалось получить данные пользователя');
+            });
 
-        // Функция для загрузки вашего виджета
-        function loadWidget() {
-            // Создаем элемент скрипта
+        // СОЗДАЕМ СКРИПТ ДЛЯ ВАШЕГО ВИДЖЕТА
+        function loadReserviWidget() {
+            // Создаем тег <script>
             const script = document.createElement('script');
+            
+            // Указываем адрес скрипта Reservi.ru
             script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
             
-            // Добавляем data-атрибуты
+            // Добавляем ваш API ключ
             script.setAttribute('data-fit-apikey', '42e1e4d1-499e-4154-a343-c50637c858c5');
+            
+            // Указываем тип - расписание
             script.setAttribute('data-type', 'schedule');
+            
+            // Тема - светлая
             script.setAttribute('data-theme', 'light');
             
-            // Настройки виджета
-            const settings = {
+            // Настройки с club_id (ваш клуб)
+            script.setAttribute('data-settings', JSON.stringify({
                 url_data: {
                     club_id: '76f052aa-70d0-11ef-9cd6-00505683c1c3'
                 },
-                // Добавляем дополнительные параметры для мобильной версии
-                mobile: true,
-                container: '#schedule-widget'
-            };
+                container: '#reservi-widget'  // куда загружать виджет
+            }));
             
-            script.setAttribute('data-settings', JSON.stringify(settings));
+            // Добавляем скрипт на страницу
+            document.head.appendChild(script);
             
-            // Обработка загрузки скрипта
-            script.onload = function() {
-                console.log('Виджет успешно загружен');
-                
-                // Сообщаем VK, что приложение загружено
-                vkBridge.send('VKWebAppShowSnackbar', {
-                    text: 'Расписание загружено',
-                    duration: 'short'
-                });
-            };
-            
-            script.onerror = function() {
-                console.error('Ошибка загрузки виджета');
-                
-                // Показываем сообщение об ошибке
-                document.getElementById('schedule-widget').innerHTML = `
-                    <div style="padding: 20px; text-align: center;">
-                        <h3>Ошибка загрузки</h3>
-                        <p>Не удалось загрузить расписание. Пожалуйста, попробуйте позже.</p>
-                        <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 15px;">
-                            Обновить
-                        </button>
-                    </div>
-                `;
-            };
-            
-            // Добавляем скрипт в документ
-            document.body.appendChild(script);
+            console.log('Виджет Reservi.ru загружается...');
         }
 
-        // Загружаем виджет после инициализации страницы
-        document.addEventListener('DOMContentLoaded', loadWidget);
-        
-        // Обработка изменения размеров экрана (для мобильных устройств)
-        window.addEventListener('resize', function() {
-            // Можно добавить логику для адаптации
-        });
+        // Запускаем загрузку виджета, когда страница готова
+        document.addEventListener('DOMContentLoaded', loadReserviWidget);
     </script>
-    
-    <!-- Дополнительные стили для улучшения отображения -->
-    <style>
-        /* Скрываем возможные лишние элементы */
-        .fit-powered-by {
-            display: none !important; /* Если нужно скрыть копирайты */
-        }
-    </style>
 </body>
 </html>
