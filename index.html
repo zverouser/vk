@@ -1,92 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Аренда в фитнес-клубе</title>
-    
-    <!-- VK Bridge для работы в ВК -->
-    <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
-    
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #ebedf0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        #widget-container {
-            width: 100%;
-            min-height: 100vh;
-        }
-    </style>
+    <title>Тест виджета Reservi</title>
 </head>
 <body>
-    <!-- Это контейнер, куда будем вставлять виджет -->
-    <div id="widget-container"></div>
+    <!-- Минимальный код виджета -->
+    <div data-fit-apikey="b137fb54-9705-4a88-8738-f1422ad91289" 
+         data-type="schedule" 
+         data-theme="light" 
+         data-settings='{
+             "url_data": {
+                 "page": "schedule",
+                 "type": "rent",
+                 "club_id": "f1c7788a-557e-11f0-910a-00505683cb0f",
+                 "show_type": "day",
+                 "rent_default_view": "services"
+             }
+         }'>
+    </div>
 
-    <!-- ВАЖНО: Весь скрипт виджета будет вставлен сюда -->
-    <div id="reservi-script-container"></div>
-
-    <script>
-        // Инициализация VK Bridge
-        vkBridge.send('VKWebAppInit');
-
-        // Функция загрузки виджета
-        function loadReserviWidget() {
-            // 1. Сначала создаем элемент с data-атрибутами, который найдет init.js
-            const widgetElement = document.createElement('div');
-            widgetElement.setAttribute('data-fit-apikey', 'b137fb54-9705-4a88-8738-f1422ad91289');
-            widgetElement.setAttribute('data-type', 'schedule');
-            widgetElement.setAttribute('data-theme', 'light');
-            
-            // Настройки (ваши новые настройки для аренды)
-            const settings = {
-                url_data: {
-                    page: "schedule",
-                    type: "rent",
-                    club_id: "f1c7788a-557e-11f0-910a-00505683cb0f",
-                    show_type: "day",
-                    rent_default_view: "services"
-                },
-                router: {
-                    off: true
-                },
-                schedule: {
-                    blocks_show: {
-                        navigation: true
-                    },
-                    filter: {
-                        services_avail: [
-                            "c405e0d0-d0fd-11f0-997d-00505683cb0f",
-                            "7d931ae0-d0fe-11f0-9b19-00505683cb0f"
-                        ]
-                    }
-                }
-            };
-            
-            widgetElement.setAttribute('data-settings', JSON.stringify(settings));
-            
-            // Вставляем этот элемент в контейнер виджета
-            document.getElementById('widget-container').appendChild(widgetElement);
-
-            // 2. Теперь создаем и вставляем скрипт init.js
-            const script = document.createElement('script');
-            script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
-            script.async = true;
-            
-            // Вставляем скрипт в специальный контейнер
-            document.getElementById('reservi-script-container').appendChild(script);
-            
-            console.log('Виджет Reservi загружается с новыми настройками...');
-        }
-
-        // Запускаем загрузку после полной загрузки страницы
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadReserviWidget);
-        } else {
-            loadReserviWidget();
-        }
-    </script>
+    <script src="https://reservi.ru/widget-fit1c.v4/public/init.js"></script>
+    
+    <h1 style="text-align: center; margin-top: 50px;">Если вы видите этот текст, HTML работает, а виджет нет</h1>
 </body>
 </html>
