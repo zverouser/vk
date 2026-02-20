@@ -19,13 +19,13 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         
-        /* Контейнер для виджета - занимает всё доступное пространство */
+        /* Контейнер для виджета */
         #widget-container {
             flex: 1 0 auto;
             width: 100%;
         }
         
-        /* Футер с вашей надписью */
+        /* Футер */
         .footer {
             flex-shrink: 0;
             text-align: center;
@@ -34,63 +34,159 @@
             color: #818c99;
             background: #ffffff;
             border-top: 1px solid #e7e8ec;
-            box-shadow: 0 -2px 4px rgba(0,0,0,0.02);
         }
         
         .footer a {
             color: #3f8ae0;
             text-decoration: none;
             font-weight: 500;
-            transition: opacity 0.2s;
         }
         
-        .footer a:hover {
-            opacity: 0.8;
-            text-decoration: underline;
+        /* Панель для ввода ключа */
+        .setup-panel {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
         }
         
-        .footer span {
-            color: #99a2ad;
-            margin: 0 4px;
+        .setup-panel h2 {
+            margin: 0 0 10px;
+            color: #333;
         }
         
-        /* Для мобильных устройств */
-        @media (max-width: 480px) {
-            .footer {
-                font-size: 11px;
-                padding: 8px 0;
-            }
+        .setup-panel p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        #apiKeyInput {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        
+        #saveBtn {
+            background: #3f8ae0;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        #saveBtn:hover {
+            background: #2a6fc9;
+        }
+        
+        .hidden {
+            display: none;
         }
     </style>
 </head>
 <body>
-    <!-- Основной контейнер для виджета -->
-    <div id="widget-container">
-        <!-- ВАШ ОРИГИНАЛЬНЫЙ РАБОЧИЙ СКРИПТ -->
-        <script src="https://reservi.ru/widget-fit1c.v4/public/init.js" 
-                data-fit-apikey="42e1e4d1-499e-4154-a343-c50637c858c5" 
-                data-type="schedule" 
-                data-theme='light' 
-                data-settings='{
-                    "url_data": {
-                        "club_id": "76f052aa-70d0-11ef-9cd6-00505683c1a3"
-                    }
-                }'>
-        </script>
+    <!-- Панель для ввода ключа (показывается при первом запуске) -->
+    <div id="setupPanel" class="setup-panel">
+        <h2>🔑 Настройка приложения</h2>
+        <p>Введите API ключ вашего фитнес-клуба</p>
+        <input type="text" id="apiKeyInput" placeholder="Например: 42e1e4d1-499e-4154-a343-c50637c858c5">
+        <button id="saveBtn">Сохранить</button>
     </div>
+
+    <!-- Основной контейнер для виджета (изначально скрыт) -->
+    <div id="widget-container" class="hidden"></div>
     
-    <!-- ФУТЕР с вашей надписью и ссылкой -->
+    <!-- ФУТЕР (всегда виден) -->
     <div class="footer">
         Работает на <a href="https://www.fitness1c.ru/schedule_record" target="_blank" rel="noopener noreferrer">1С Фитнес клуб</a>
     </div>
 
-    <!-- Инициализация VK Bridge -->
     <script>
-        // Функция для инициализации после загрузки страницы
-        window.onload = function() {
-            vkBridge.send('VKWebAppInit');
-            console.log('VK Bridge инициализирован');
-        };
+        // Инициализация VK Bridge
+        vkBridge.send('VKWebAppInit');
+        
+        // Получаем элементы
+        const setupPanel = document.getElementById('setupPanel');
+        const widgetContainer = document.getElementById('widget-container');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const saveBtn = document.getElementById('saveBtn');
+        
+        // Функция для загрузки виджета с указанным ключом
+        function loadWidget(apiKey) {
+            // Очищаем контейнер
+            widgetContainer.innerHTML = '';
+            
+            // Создаем скрипт с подставленным API ключом
+            const script = document.createElement('script');
+            script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
+            script.setAttribute('data-fit-apikey', apiKey);
+            script.setAttribute('data-type', 'schedule');
+            script.setAttribute('data-theme', 'light');
+            script.setAttribute('data-settings', JSON.stringify({
+                url_data: {
+                    "club_id": "76f052aa-70d0-11ef-9cd6-00505683c1a3"
+                }
+            }));
+            
+            // Добавляем скрипт в контейнер
+            widgetContainer.appendChild(script);
+            
+            // Показываем контейнер и скрываем панель настройки
+            widgetContainer.classList.remove('hidden');
+            setupPanel.classList.add('hidden');
+            
+            console.log('Виджет загружен с ключом:', apiKey);
+        }
+        
+        // Функция для получения ID сообщества (чтобы хранить ключи отдельно для каждого сообщества)
+        function getCommunityId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('vk_group_id') || 'default';
+        }
+        
+        // При загрузке страницы проверяем, есть ли сохраненный ключ
+        const communityId = getCommunityId();
+        const savedKey = localStorage.getItem('api_key_' + communityId);
+        
+        if (savedKey) {
+            // Если ключ есть - сразу загружаем виджет
+            loadWidget(savedKey);
+        } else {
+            // Если ключа нет - показываем панель ввода
+            setupPanel.classList.remove('hidden');
+        }
+        
+        // Обработчик кнопки сохранения
+        saveBtn.addEventListener('click', function() {
+            const apiKey = apiKeyInput.value.trim();
+            
+            if (apiKey) {
+                // Сохраняем ключ для этого сообщества
+                localStorage.setItem('api_key_' + communityId, apiKey);
+                
+                // Загружаем виджет
+                loadWidget(apiKey);
+            } else {
+                alert('Пожалуйста, введите API ключ');
+            }
+        });
+        
+        // Разрешаем сохранение по Enter
+        apiKeyInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                saveBtn.click();
+            }
+        });
     </script>
 </body>
 </html>
