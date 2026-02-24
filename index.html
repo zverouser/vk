@@ -92,15 +92,33 @@
         .hidden {
             display: none;
         }
+
+        /* Сообщение для обычных пользователей */
+        .info-message {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            color: #666;
+        }
     </style>
 </head>
 <body>
-    <!-- Панель для ввода ключа (показывается при первом запуске) -->
-    <div id="setupPanel" class="setup-panel">
+    <!-- Панель для ввода ключа (показывается только владельцу сообщества) -->
+    <div id="setupPanel" class="setup-panel hidden">
         <h2>🔑 Настройка приложения</h2>
         <p>Введите API ключ вашего фитнес-клуба</p>
         <input type="text" id="apiKeyInput" placeholder="Например: 42e1e4d1-499e-4154-a343-c50637c858c5">
         <button id="saveBtn">Сохранить</button>
+    </div>
+
+    <!-- Сообщение для обычных пользователей, если ключ не настроен -->
+    <div id="notConfiguredMessage" class="info-message hidden">
+        <h2>⏳ Приложение настраивается</h2>
+        <p>Расписание появится здесь после настройки администратором сообщества</p>
     </div>
 
     <!-- Основной контейнер для виджета (изначально скрыт) -->
@@ -118,6 +136,7 @@
         // Получаем элементы
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
+        const notConfiguredMessage = document.getElementById('notConfiguredMessage');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
         
@@ -141,30 +160,103 @@
             // Добавляем скрипт в контейнер
             widgetContainer.appendChild(script);
             
-            // Показываем контейнер и скрываем панель настройки
+            // Показываем контейнер и скрываем остальные элементы
             widgetContainer.classList.remove('hidden');
             setupPanel.classList.add('hidden');
+            notConfiguredMessage.classList.add('hidden');
             
             console.log('Виджет загружен с ключом:', apiKey);
         }
         
-        // Функция для получения ID сообщества (чтобы хранить ключи отдельно для каждого сообщества)
+        // Функция для получения ID сообщества из URL
         function getCommunityId() {
             const params = new URLSearchParams(window.location.search);
             return params.get('vk_group_id') || 'default';
         }
         
-        // При загрузке страницы проверяем, есть ли сохраненный ключ
-        const communityId = getCommunityId();
-        const savedKey = localStorage.getItem('api_key_' + communityId);
-        
-        if (savedKey) {
-            // Если ключ есть - сразу загружаем виджет
-            loadWidget(savedKey);
-        } else {
-            // Если ключа нет - показываем панель ввода
-            setupPanel.classList.remove('hidden');
+        // Функция для определения прав пользователя через VK Bridge
+        async function checkUserPermissions() {
+            try {
+                // Получаем информацию о текущем пользователе
+                const userInfo = await vkBridge.send('VKWebAppGetUserInfo');
+                
+                // Получаем ID сообщества
+                const communityId = getCommunityId();
+                
+                // Проверяем, является ли пользователь администратором сообщества
+                // Для этого нужно использовать VKWebAppGetGroupInfo или VKWebAppGetCommunityToken
+                // В данном случае мы используем простую проверку через localStorage
+                // В реальном приложении лучше использовать VK API для проверки прав
+                
+                // Пытаемся получить информацию о группе
+                try {
+                    const groupInfo = await vkBridge.send('VKWebAppGetGroupInfo', {
+                        group_id: communityId
+                    });
+                    
+                    // Проверяем, является ли пользователь администратором
+                    // В groupInfo может быть поле is_admin или аналогичное
+                    return groupInfo.is_admin || false;
+                } catch (error) {
+                    console.log('Не удалось получить информацию о группе:', error);
+                    return false;
+                }
+            } catch (error) {
+                console.log('Не удалось получить информацию о пользователе:', error);
+                return false;
+            }
         }
+        
+        // Функция для проверки прав пользователя (упрощенная версия)
+        async function isCommunityAdmin() {
+            try {
+                // Пробуем получить токен сообщества (доступен только у администраторов)
+                const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
+                    app_id: 54458532, // Здесь должен быть ID вашего приложения
+                    group_id: getCommunityId()
+                });
+                
+                // Если получили токен - значит пользователь администратор
+                return tokenData && tokenData.access_token ? true : false;
+            } catch (error) {
+                console.log('Пользователь не является администратором:', error);
+                return false;
+            }
+        }
+        
+        // Основная логика при загрузке страницы
+        async function initApp() {
+            const communityId = getCommunityId();
+            const savedKey = localStorage.getItem('api_key_' + communityId);
+            
+            if (savedKey) {
+                // Если ключ есть - сразу показываем виджет всем
+                loadWidget(savedKey);
+            } else {
+                // Если ключа нет, проверяем права пользователя
+                try {
+                    const isAdmin = await isCommunityAdmin();
+                    
+                    if (isAdmin) {
+                        // Если пользователь администратор - показываем панель ввода
+                        setupPanel.classList.remove('hidden');
+                        notConfiguredMessage.classList.add('hidden');
+                    } else {
+                        // Если обычный пользователь - показываем сообщение о настройке
+                        setupPanel.classList.add('hidden');
+                        notConfiguredMessage.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    // В случае ошибки показываем сообщение о настройке
+                    console.log('Ошибка проверки прав:', error);
+                    setupPanel.classList.add('hidden');
+                    notConfiguredMessage.classList.add('hidden');
+                }
+            }
+        }
+        
+        // Запускаем приложение
+        initApp();
         
         // Обработчик кнопки сохранения
         saveBtn.addEventListener('click', function() {
@@ -172,6 +264,7 @@
             
             if (apiKey) {
                 // Сохраняем ключ для этого сообщества
+                const communityId = getCommunityId();
                 localStorage.setItem('api_key_' + communityId, apiKey);
                 
                 // Загружаем виджет
