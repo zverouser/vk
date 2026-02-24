@@ -4,207 +4,190 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Запись в фитнес-клуб</title>
+    
     <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
+    
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            padding: 20px;
+        body {
+            margin: 0;
+            padding: 0;
             background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        .container {
+        
+        #widget-container {
+            flex: 1 0 auto;
+            width: 100%;
+        }
+        
+        .footer {
+            flex-shrink: 0;
+            text-align: center;
+            padding: 12px 0;
+            font-size: 13px;
+            color: #818c99;
+            background: #ffffff;
+            border-top: 1px solid #e7e8ec;
+        }
+        
+        .footer a {
+            color: #3f8ae0;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .setup-panel {
             max-width: 400px;
             margin: 50px auto;
             background: white;
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
         }
-        button { 
-            padding: 12px 20px; 
-            margin: 5px 0; 
-            cursor: pointer;
-            width: 100%;
-            background: #3f8ae0;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
+        
+        .setup-panel h2 {
+            margin: 0 0 10px;
+            color: #333;
         }
-        button:hover {
-            background: #2a6fc9;
+        
+        .setup-panel p {
+            color: #666;
+            margin-bottom: 20px;
         }
-        input {
+        
+        #apiKeyInput {
             width: 100%;
             padding: 12px;
             border: 2px solid #ddd;
             border-radius: 6px;
             font-size: 14px;
-            margin: 10px 0;
+            margin-bottom: 15px;
             box-sizing: border-box;
+            font-family: monospace;
         }
+        
+        #saveBtn {
+            background: #3f8ae0;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        #saveBtn:hover {
+            background: #2a6fc9;
+        }
+        
         .hidden {
             display: none;
         }
-        .info {
-            background: #e3f2fd;
-            padding: 10px;
-            border-radius: 6px;
-            margin: 10px 0;
-            font-size: 14px;
+
+        .info-message {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            color: #666;
         }
-        .error {
-            background: #ffebee;
-            color: #c62828;
-            padding: 10px;
-            border-radius: 6px;
-            margin: 10px 0;
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .error-message {
+            color: #e64646;
+            margin-top: 10px;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2 style="text-align: center;">🏋️ Фитнес-клуб</h2>
-        
-        <div id="loading">
-            <p style="text-align: center;">⏳ Загрузка...</p>
-        </div>
-        
-        <div id="setupPanel" class="hidden">
-            <h3>🔑 Настройка приложения</h3>
-            <p>Введите API ключ вашего фитнес-клуба:</p>
-            <input type="text" id="apiKeyInput" placeholder="API ключ">
-            <button id="saveBtn">Сохранить</button>
-        </div>
+    <div id="loading" class="loading">
+        ⏳ Загрузка...
+    </div>
 
-        <div id="messagePanel" class="hidden">
-            <p>⏳ Приложение настраивается администратором сообщества</p>
-        </div>
+    <div id="setupPanel" class="setup-panel hidden">
+        <h2>🔑 Настройка приложения</h2>
+        <p>Введите API ключ вашего фитнес-клуба</p>
+        <input type="text" id="apiKeyInput" placeholder="API ключ">
+        <button id="saveBtn">Сохранить</button>
+        <div id="errorMessage" class="error-message hidden"></div>
+    </div>
 
-        <div id="widgetContainer" class="hidden">
-            <!-- Здесь будет виджет -->
-        </div>
+    <div id="notConfiguredMessage" class="info-message hidden">
+        <h2>⏳ Приложение настраивается</h2>
+        <p>Расписание появится здесь после настройки администратором сообщества</p>
+    </div>
 
-        <hr style="margin: 20px 0;">
-        
-        <h4>🛠️ Отладка</h4>
-        <button id="testAdminBtn">1. Проверить права администратора</button>
-        <button id="showSetupBtn">2. Показать панель ввода (временно)</button>
-        <button id="resetKeyBtn">3. Сбросить ключ</button>
-        
-        <div id="debugInfo" class="info hidden"></div>
-        <div id="errorInfo" class="error hidden"></div>
+    <div id="widget-container" class="hidden"></div>
+    
+    <div class="footer">
+        Работает на <a href="https://www.fitness1c.ru/schedule_record" target="_blank" rel="noopener noreferrer">1С Фитнес клуб</a>
     </div>
 
     <script>
         // Инициализация VK Bridge
         vkBridge.send('VKWebAppInit');
         
-        // ID вашего приложения
         const APP_ID = 54458532;
         
-        // Получаем элементы
         const loading = document.getElementById('loading');
         const setupPanel = document.getElementById('setupPanel');
-        const messagePanel = document.getElementById('messagePanel');
-        const widgetContainer = document.getElementById('widgetContainer');
+        const widgetContainer = document.getElementById('widget-container');
+        const notConfiguredMessage = document.getElementById('notConfiguredMessage');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
-        const testAdminBtn = document.getElementById('testAdminBtn');
-        const showSetupBtn = document.getElementById('showSetupBtn');
-        const resetKeyBtn = document.getElementById('resetKeyBtn');
-        const debugInfo = document.getElementById('debugInfo');
-        const errorInfo = document.getElementById('errorInfo');
-        
-        // Получаем ID сообщества из URL
+        const errorMessage = document.getElementById('errorMessage');
+
+        // ИСПРАВЛЕННАЯ функция получения ID сообщества
         function getCommunityId() {
+            // Пробуем получить из pathname (как в вашем URL)
+            const pathname = window.location.pathname;
+            console.log('Pathname:', pathname);
+            
+            // Ищем паттерн /app123456_-789
+            const match = pathname.match(/\/app\d+_-(\d+)/);
+            if (match) {
+                console.log('Нашли ID в pathname:', match[1]);
+                return match[1];
+            }
+            
+            // Пробуем из параметров URL
             const params = new URLSearchParams(window.location.search);
-            return params.get('vk_group_id');
-        }
-        
-        // Показать отладочную информацию
-        function showDebug(message) {
-            debugInfo.textContent = message;
-            debugInfo.classList.remove('hidden');
-            setTimeout(() => debugInfo.classList.add('hidden'), 5000);
-        }
-        
-        // Показать ошибку
-        function showError(message) {
-            errorInfo.textContent = message;
-            errorInfo.classList.remove('hidden');
-        }
-        
-        // Проверка прав администратора
-        async function checkIsAdmin() {
-            const communityId = getCommunityId();
+            let groupId = params.get('vk_group_id');
             
-            if (!communityId) {
-                showError('Приложение не в сообществе');
-                return false;
+            if (groupId) {
+                console.log('Нашли ID в параметрах:', groupId);
+                return groupId;
             }
             
-            showDebug('Проверяем права для группы ' + communityId + '...');
-            
-            try {
-                const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
-                    app_id: APP_ID,
-                    group_id: communityId,
-                    scope: 'wall'
-                });
-                
-                console.log('Ответ VK:', tokenData);
-                
-                if (tokenData && tokenData.access_token) {
-                    showDebug('✅ Вы администратор!');
-                    return true;
-                } else {
-                    showDebug('❌ Вы не администратор');
-                    return false;
+            // Пробуем из hash
+            if (window.location.hash) {
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                groupId = hashParams.get('vk_group_id');
+                if (groupId) {
+                    console.log('Нашли ID в hash:', groupId);
+                    return groupId;
                 }
-            } catch (error) {
-                console.error('Ошибка:', error);
-                showDebug('❌ Ошибка: ' + error.error_type);
-                showError('Детали: ' + JSON.stringify(error));
-                return false;
             }
-        }
-        
-        // Сохранить ключ
-        async function saveApiKey(apiKey) {
-            const communityId = getCommunityId();
             
-            try {
-                await vkBridge.send('VKWebAppStorageSet', {
-                    key: 'api_key_' + communityId,
-                    value: apiKey
-                });
-                return true;
-            } catch (error) {
-                console.error('Ошибка сохранения:', error);
-                return false;
-            }
+            console.log('ID группы не найден');
+            return null;
         }
-        
-        // Получить ключ
-        async function getApiKey() {
-            const communityId = getCommunityId();
-            
-            try {
-                const result = await vkBridge.send('VKWebAppStorageGet', {
-                    keys: ['api_key_' + communityId]
-                });
-                
-                if (result.keys && result.keys[0] && result.keys[0].value) {
-                    return result.keys[0].value;
-                }
-                return null;
-            } catch (error) {
-                console.error('Ошибка получения ключа:', error);
-                return null;
-            }
-        }
-        
-        // Загрузить виджет
+
+        // Загрузка виджета
         function loadWidget(apiKey) {
             widgetContainer.innerHTML = '';
             
@@ -221,91 +204,151 @@
             
             widgetContainer.appendChild(script);
             
-            // Показываем виджет
             widgetContainer.classList.remove('hidden');
             setupPanel.classList.add('hidden');
-            messagePanel.classList.add('hidden');
+            notConfiguredMessage.classList.add('hidden');
             loading.classList.add('hidden');
         }
-        
-        // Инициализация приложения
-        async function initApp() {
+
+        // Получение ключа из хранилища VK
+        async function getApiKey() {
             const communityId = getCommunityId();
+            if (!communityId) return null;
+            
+            try {
+                const result = await vkBridge.send('VKWebAppStorageGet', {
+                    keys: ['api_key_' + communityId]
+                });
+                
+                if (result.keys && result.keys[0] && result.keys[0].value) {
+                    return result.keys[0].value;
+                }
+                return null;
+            } catch (error) {
+                console.error('Ошибка получения ключа:', error);
+                return null;
+            }
+        }
+
+        // Сохранение ключа
+        async function saveApiKey(apiKey) {
+            const communityId = getCommunityId();
+            if (!communityId) {
+                errorMessage.textContent = 'Не удалось определить ID сообщества';
+                errorMessage.classList.remove('hidden');
+                return false;
+            }
+            
+            try {
+                await vkBridge.send('VKWebAppStorageSet', {
+                    key: 'api_key_' + communityId,
+                    value: apiKey
+                });
+                return true;
+            } catch (error) {
+                console.error('Ошибка сохранения:', error);
+                return false;
+            }
+        }
+
+        // Проверка прав администратора
+        async function checkIsAdmin() {
+            const communityId = getCommunityId();
+            if (!communityId) return false;
+            
+            try {
+                const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
+                    app_id: APP_ID,
+                    group_id: communityId,
+                    scope: 'wall'
+                });
+                
+                return !!(tokenData && tokenData.access_token);
+            } catch (error) {
+                console.log('Не админ:', error);
+                return false;
+            }
+        }
+
+        // Инициализация
+        async function init() {
+            console.log('🚀 Инициализация...');
+            
+            const communityId = getCommunityId();
+            console.log('Community ID:', communityId);
             
             if (!communityId) {
-                messagePanel.querySelector('p').textContent = '❌ Приложение должно быть открыто в сообществе';
                 loading.classList.add('hidden');
-                messagePanel.classList.remove('hidden');
+                notConfiguredMessage.querySelector('p').textContent = 'Ошибка определения сообщества';
+                notConfiguredMessage.classList.remove('hidden');
                 return;
             }
             
-            console.log('ID сообщества:', communityId);
-            
             // Проверяем сохраненный ключ
             const savedKey = await getApiKey();
+            console.log('Saved key:', savedKey ? 'есть' : 'нет');
             
             if (savedKey) {
                 loadWidget(savedKey);
                 return;
             }
             
-            // Ключа нет - проверяем права
+            // Проверяем права
             const isAdmin = await checkIsAdmin();
+            console.log('Is admin:', isAdmin);
             
             if (isAdmin) {
+                loading.classList.add('hidden');
                 setupPanel.classList.remove('hidden');
-                loading.classList.add('hidden');
             } else {
-                messagePanel.classList.remove('hidden');
                 loading.classList.add('hidden');
+                notConfiguredMessage.classList.remove('hidden');
             }
         }
-        
-        // Обработчики кнопок
+
+        // Обработчики
         saveBtn.addEventListener('click', async () => {
             const apiKey = apiKeyInput.value.trim();
             
-            if (apiKey) {
-                saveBtn.disabled = true;
-                saveBtn.textContent = 'Сохранение...';
-                
-                const success = await saveApiKey(apiKey);
-                
-                if (success) {
-                    loadWidget(apiKey);
-                } else {
-                    showError('Ошибка сохранения ключа');
-                    saveBtn.disabled = false;
-                    saveBtn.textContent = 'Сохранить';
-                }
+            if (!apiKey) {
+                errorMessage.textContent = 'Введите API ключ';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+            
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Сохранение...';
+            errorMessage.classList.add('hidden');
+            
+            const success = await saveApiKey(apiKey);
+            
+            if (success) {
+                loadWidget(apiKey);
+            } else {
+                errorMessage.textContent = 'Ошибка сохранения';
+                errorMessage.classList.remove('hidden');
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'Сохранить';
             }
         });
-        
-        testAdminBtn.addEventListener('click', async () => {
-            await checkIsAdmin();
+
+        apiKeyInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') saveBtn.click();
         });
-        
-        showSetupBtn.addEventListener('click', () => {
-            setupPanel.classList.remove('hidden');
-            messagePanel.classList.add('hidden');
-            loading.classList.add('hidden');
-            showDebug('Панель ввода показана принудительно');
-        });
-        
-        resetKeyBtn.addEventListener('click', async () => {
-            const communityId = getCommunityId();
-            if (communityId) {
-                await vkBridge.send('VKWebAppStorageSet', {
-                    key: 'api_key_' + communityId,
-                    value: ''
-                });
-                showDebug('Ключ сброшен, перезагрузите страницу');
-                setTimeout(() => location.reload(), 2000);
+
+        // Запуск
+        init();
+
+        // Отладка
+        window.test = {
+            getCommunityId: getCommunityId,
+            checkAdmin: checkIsAdmin,
+            showPanel: () => {
+                loading.classList.add('hidden');
+                setupPanel.classList.remove('hidden');
+                notConfiguredMessage.classList.add('hidden');
             }
-        });
-        
-        // Запускаем
-        initApp();
+        };
     </script>
 </body>
 </html>
