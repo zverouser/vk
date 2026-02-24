@@ -119,6 +119,19 @@
         .retry-button:hover {
             background: #2a6fc9;
         }
+        
+        .debug-panel {
+            background: #f0f0f0;
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            text-align: left;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow: auto;
+        }
     </style>
 </head>
 <body>
@@ -134,6 +147,9 @@
     </div>
 
     <div id="errorMessage" class="error-message hidden"></div>
+    
+    <!-- Панель отладки (будет видна только если есть ошибки) -->
+    <div id="debugPanel" class="debug-panel hidden"></div>
 
     <div id="widget-container" class="hidden"></div>
     
@@ -142,7 +158,8 @@
     </div>
 
     <script>
-        // ⚠️ ВАЖНО: ВСТАВЬТЕ СЮДА ВАШ СЕРВИСНЫЙ КЛЮЧ ИЗ VK ID
+        // ===== НАСТРОЙКИ =====
+        // ⚠️ ВАЖНО: ВСТАВЬТЕ ВАШ СЕРВИСНЫЙ КЛЮЧ ИЗ VK ID
         const SERVICE_TOKEN = '3747f79b3747f79b3747f79b8d34790f3f337473747f79b5ed0fbb904be11ce3f78097f';
         
         // ID вашего приложения
@@ -151,17 +168,29 @@
         // URL вашего Google Apps Script
         const API_SERVER = 'https://script.google.com/macros/s/AKfycbynNJBQ-D3_CC7AFTFsM4hJtc8PSiCSzE2EZXgXpnR5-GWsnx14iqJAttwQjKdwG7MP/exec';
         
-        // Элементы интерфейса
+        // ===== ЭЛЕМЕНТЫ ИНТЕРФЕЙСА =====
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
         const loader = document.getElementById('loader');
         const errorMessage = document.getElementById('errorMessage');
+        const debugPanel = document.getElementById('debugPanel');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
         
-        // Инициализация VK Bridge
-        vkBridge.send('VKWebAppInit');
+        // ===== ЛОГИРОВАНИЕ =====
+        const logs = [];
+        function addLog(message, data = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}` + (data ? `: ${JSON.stringify(data, null, 2)}` : '');
+            logs.push(logEntry);
+            console.log(logEntry, data || '');
+            
+            // Показываем панель отладки если есть ошибки
+            debugPanel.classList.remove('hidden');
+            debugPanel.innerHTML = logs.join('<br>');
+        }
         
+        // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
         function showLoader() {
             loader.classList.remove('hidden');
             setupPanel.classList.add('hidden');
@@ -190,6 +219,7 @@
         }
         
         function loadWidget(apiKey) {
+            addLog('Загрузка виджета с ключом', apiKey);
             widgetContainer.innerHTML = '';
             
             const script = document.createElement('script');
@@ -204,11 +234,13 @@
             }));
             
             script.onload = () => {
+                addLog('Виджет успешно загружен');
                 widgetContainer.classList.remove('hidden');
                 hideLoader();
             };
             
-            script.onerror = () => {
+            script.onerror = (error) => {
+                addLog('Ошибка загрузки виджета', error);
                 showError('Не удалось загрузить виджет записи. Пожалуйста, попробуйте позже.');
             };
             
@@ -240,6 +272,8 @@
         async function getApiKey(communityId) {
             try {
                 const url = `${API_SERVER}?communityId=${encodeURIComponent(communityId)}&t=${Date.now()}`;
+                addLog('Запрос ключа с сервера', url);
+                
                 const response = await fetchWithTimeout(url, {
                     method: 'GET',
                     mode: 'cors',
@@ -253,15 +287,18 @@
                 }
                 
                 const data = await response.json();
+                addLog('Ответ сервера', data);
                 return data.apiKey;
             } catch (error) {
-                console.error('Error fetching API key:', error);
+                addLog('Ошибка получения ключа', error);
                 return null;
             }
         }
         
         async function saveApiKey(communityId, apiKey) {
             try {
+                addLog('Сохранение ключа', { communityId, apiKey });
+                
                 const response = await fetchWithTimeout(API_SERVER, {
                     method: 'POST',
                     mode: 'cors',
@@ -276,75 +313,119 @@
                 }
                 
                 const data = await response.json();
+                addLog('Ключ сохранён', data);
                 return data.success;
             } catch (error) {
-                console.error('Error saving API key:', error);
+                addLog('Ошибка сохранения ключа', error);
                 return false;
             }
         }
         
-        // 🔥 НОВАЯ ФУНКЦИЯ: проверка прав администратора через сервисный ключ
+        // ===== ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА =====
         async function checkIsAdmin(communityId, userId) {
             try {
-                // Используем API напрямую через VK Bridge с сервисным ключом
-                const result = await vkBridge.send('VKWebAppCallAPIMethod', {
-                    method: 'groups.isMember',
-                    params: {
-                        group_id: communityId,
-                        user_id: userId,
-                        access_token: SERVICE_TOKEN, // Используем сервисный ключ приложения
-                        v: '5.199'
-                    }
-                });
+                addLog('Проверка прав администратора', { communityId, userId });
                 
-                console.log('Admin check result:', result);
-                return result.response && result.response.is_admin === true;
+                // Пробуем разные способы
+                
+                // Способ 1: Через API с сервисным ключом
+                try {
+                    const result = await vkBridge.send('VKWebAppCallAPIMethod', {
+                        method: 'groups.isMember',
+                        params: {
+                            group_id: communityId,
+                            user_id: userId,
+                            access_token: SERVICE_TOKEN,
+                            v: '5.199'
+                        }
+                    });
+                    
+                    addLog('Результат проверки (способ 1)', result);
+                    if (result.response && result.response.is_admin) {
+                        return true;
+                    }
+                } catch (e) {
+                    addLog('Ошибка способа 1', e);
+                }
+                
+                // Способ 2: Пробуем получить токен пользователя
+                try {
+                    const authResult = await vkBridge.send('VKWebAppGetAuthToken', {
+                        app_id: APP_ID,
+                        scope: 'groups'
+                    });
+                    
+                    addLog('Токен получен', authResult);
+                    
+                    const result = await vkBridge.send('VKWebAppCallAPIMethod', {
+                        method: 'groups.isMember',
+                        params: {
+                            group_id: communityId,
+                            user_id: userId,
+                            access_token: authResult.access_token,
+                            v: '5.199'
+                        }
+                    });
+                    
+                    addLog('Результат проверки (способ 2)', result);
+                    return result.response && result.response.is_admin === true;
+                    
+                } catch (e) {
+                    addLog('Ошибка способа 2', e);
+                }
+                
+                // Способ 3: Если ничего не работает, даём шанс владельцу
+                addLog('Все способы проверки не сработали');
+                return false;
                 
             } catch (error) {
-                console.error('Error checking admin status:', error);
+                addLog('Критическая ошибка проверки прав', error);
                 return false;
             }
         }
         
+        // ===== ОСНОВНАЯ ФУНКЦИЯ =====
         async function initializeApp() {
             const communityId = getCommunityId();
-            console.log('Initializing for community:', communityId);
+            addLog('Запуск приложения для сообщества', communityId);
             
             try {
                 showLoader();
                 
-                // 1. Получаем информацию о текущем пользователе
+                // Получаем информацию о пользователе
                 const userData = await vkBridge.send('VKWebAppGetUserInfo');
-                console.log('User data:', userData);
+                addLog('Данные пользователя', userData);
                 
-                // 2. Пытаемся получить API ключ из Google Sheets
+                // Пытаемся получить ключ
                 const apiKey = await getApiKey(communityId);
-                console.log('API key from server:', apiKey ? 'exists' : 'not found');
                 
                 if (apiKey) {
-                    // Ключ есть - показываем виджет всем
+                    addLog('Ключ найден, загружаем виджет');
                     loadWidget(apiKey);
                 } else {
-                    // Ключа нет - проверяем, администратор ли это (через сервисный ключ)
+                    addLog('Ключ не найден, проверяем права администратора');
+                    
+                    // Проверяем права
                     const isAdmin = await checkIsAdmin(communityId, userData.id);
-                    console.log('Is admin:', isAdmin);
+                    addLog('Результат проверки прав', { isAdmin });
                     
                     if (isAdmin) {
-                        // Показываем панель настройки администратору
+                        addLog('Пользователь администратор, показываем панель настройки');
                         hideLoader();
                         setupPanel.classList.remove('hidden');
                     } else {
-                        // Обычный пользователь, ключа нет
+                        addLog('Пользователь не администратор, показываем сообщение об ошибке');
                         showError('Приложение ещё не настроено. Пожалуйста, обратитесь к администратору сообщества.', false);
                     }
                 }
                 
             } catch (error) {
-                console.error('Initialization error:', error);
+                addLog('Критическая ошибка инициализации', error);
                 showError('Произошла ошибка при загрузке приложения. Пожалуйста, попробуйте позже.');
             }
         }
         
+        // ===== ОБРАБОТЧИКИ =====
         saveBtn.addEventListener('click', async function() {
             const apiKey = apiKeyInput.value.trim();
             
@@ -371,8 +452,14 @@
             }
         });
         
-        // Запускаем приложение
-        initializeApp();
+        // Инициализация VK Bridge и запуск
+        vkBridge.send('VKWebAppInit').then(() => {
+            addLog('VK Bridge инициализирован');
+            initializeApp();
+        }).catch(error => {
+            addLog('Ошибка инициализации VK Bridge', error);
+            showError('Не удалось инициализировать приложение');
+        });
     </script>
 </body>
 </html>
