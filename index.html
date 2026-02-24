@@ -42,7 +42,7 @@
             font-weight: 500;
         }
         
-        /* Панель для ввода ключа */
+        /* Панель для ввода ключа (только для админа) */
         .setup-panel {
             max-width: 400px;
             margin: 50px auto;
@@ -89,19 +89,44 @@
             background: #2a6fc9;
         }
         
+        /* Индикатор загрузки */
+        .loader {
+            text-align: center;
+            padding: 50px;
+            color: #818c99;
+        }
+        
         .hidden {
             display: none;
+        }
+        
+        /* Сообщение об ошибке */
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <!-- Панель для ввода ключа (показывается при первом запуске) -->
-    <div id="setupPanel" class="setup-panel">
+    <!-- Панель для ввода ключа (показывается только администратору при первом запуске) -->
+    <div id="setupPanel" class="setup-panel hidden">
         <h2>🔑 Настройка приложения</h2>
         <p>Введите API ключ вашего фитнес-клуба</p>
         <input type="text" id="apiKeyInput" placeholder="Например: 42e1e4d1-499e-4154-a343-c50637c858c5">
         <button id="saveBtn">Сохранить</button>
     </div>
+
+    <!-- Индикатор загрузки -->
+    <div id="loader" class="loader hidden">
+        ⏳ Загрузка...
+    </div>
+
+    <!-- Сообщение об ошибке -->
+    <div id="errorMessage" class="error-message hidden"></div>
 
     <!-- Основной контейнер для виджета (изначально скрыт) -->
     <div id="widget-container" class="hidden"></div>
@@ -118,8 +143,32 @@
         // Получаем элементы
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('errorMessage');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
+        
+        // URL вашего сервера для хранения ключей
+        // ⚠️ ВАЖНО: замените на URL вашего реального сервера!
+        const API_SERVER = 'https://ваш-сервер.com/api';
+        
+        // Вспомогательные функции для показа/скрытия элементов
+        function showLoader() {
+            loader.classList.remove('hidden');
+            setupPanel.classList.add('hidden');
+            widgetContainer.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        }
+        
+        function hideLoader() {
+            loader.classList.add('hidden');
+        }
+        
+        function showError(text) {
+            errorMessage.textContent = text;
+            errorMessage.classList.remove('hidden');
+            hideLoader();
+        }
         
         // Функция для загрузки виджета с указанным ключом
         function loadWidget(apiKey) {
@@ -141,43 +190,101 @@
             // Добавляем скрипт в контейнер
             widgetContainer.appendChild(script);
             
-            // Показываем контейнер и скрываем панель настройки
+            // Показываем контейнер и скрываем всё лишнее
             widgetContainer.classList.remove('hidden');
             setupPanel.classList.add('hidden');
+            hideLoader();
             
             console.log('Виджет загружен с ключом:', apiKey);
         }
         
-        // Функция для получения ID сообщества (чтобы хранить ключи отдельно для каждого сообщества)
+        // Функция для получения ID сообщества из URL
         function getCommunityId() {
             const params = new URLSearchParams(window.location.search);
             return params.get('vk_group_id') || 'default';
         }
         
-        // При загрузке страницы проверяем, есть ли сохраненный ключ
-        const communityId = getCommunityId();
-        const savedKey = localStorage.getItem('api_key_' + communityId);
-        
-        if (savedKey) {
-            // Если ключ есть - сразу загружаем виджет
-            loadWidget(savedKey);
-        } else {
-            // Если ключа нет - показываем панель ввода
-            setupPanel.classList.remove('hidden');
+        // Функция для получения прав пользователя и загрузки ключа
+        async function initializeApp() {
+            const communityId = getCommunityId();
+            console.log('ID сообщества:', communityId);
+            
+            try {
+                // 1. Получаем информацию о текущем пользователе
+                showLoader();
+                const userData = await vkBridge.send('VKWebAppGetUserInfo');
+                console.log('Пользователь:', userData);
+                
+                // 2. Проверяем, является ли пользователь администратором
+                const isAdminData = await vkBridge.send('VKWebAppCallAPIMethod', {
+                    method: 'groups.isMember',
+                    params: {
+                        group_id: communityId,
+                        user_id: userData.id,
+                        v: '5.199'
+                    }
+                });
+                
+                const isAdmin = isAdminData.response && isAdminData.response.is_admin === true;
+                console.log('Администратор?', isAdmin);
+                
+                // 3. Пытаемся получить ключ с сервера
+                const response = await fetch(`${API_SERVER}/get_key?communityId=${communityId}`);
+                const data = await response.json();
+                
+                if (data.apiKey) {
+                    // Ключ уже сохранен - загружаем виджет для всех
+                    loadWidget(data.apiKey);
+                } else if (isAdmin) {
+                    // Ключа нет, и это админ - показываем панель ввода
+                    hideLoader();
+                    setupPanel.classList.remove('hidden');
+                } else {
+                    // Ключа нет, и это не админ - показываем сообщение
+                    showError('Приложение ещё не настроено. Пожалуйста, обратитесь к администратору сообщества.');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка инициализации:', error);
+                showError('Произошла ошибка при загрузке приложения. Пожалуйста, попробуйте позже.');
+            }
         }
         
         // Обработчик кнопки сохранения
-        saveBtn.addEventListener('click', function() {
+        saveBtn.addEventListener('click', async function() {
             const apiKey = apiKeyInput.value.trim();
             
-            if (apiKey) {
-                // Сохраняем ключ для этого сообщества
-                localStorage.setItem('api_key_' + communityId, apiKey);
-                
-                // Загружаем виджет
-                loadWidget(apiKey);
-            } else {
+            if (!apiKey) {
                 alert('Пожалуйста, введите API ключ');
+                return;
+            }
+            
+            const communityId = getCommunityId();
+            showLoader();
+            
+            try {
+                // Отправляем ключ на сервер
+                const response = await fetch(`${API_SERVER}/save_key`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        communityId: communityId,
+                        apiKey: apiKey
+                    })
+                });
+                
+                if (response.ok) {
+                    // Успешно сохранили - загружаем виджет
+                    loadWidget(apiKey);
+                } else {
+                    throw new Error('Ошибка при сохранении ключа');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка сохранения:', error);
+                showError('Не удалось сохранить ключ. Пожалуйста, попробуйте позже.');
             }
         });
         
@@ -187,6 +294,9 @@
                 saveBtn.click();
             }
         });
+        
+        // Запускаем инициализацию при загрузке страницы
+        initializeApp();
     </script>
 </body>
 </html>
