@@ -105,12 +105,6 @@
             padding: 50px;
             color: #666;
         }
-
-        .error-message {
-            color: #e64646;
-            margin-top: 10px;
-            font-size: 14px;
-        }
     </style>
 </head>
 <body>
@@ -123,7 +117,7 @@
         <p>Введите API ключ вашего фитнес-клуба</p>
         <input type="text" id="apiKeyInput" placeholder="API ключ">
         <button id="saveBtn">Сохранить</button>
-        <div id="errorMessage" class="error-message hidden"></div>
+        <div id="errorMessage" style="color: red; margin-top: 10px; display: none;"></div>
     </div>
 
     <div id="notConfiguredMessage" class="info-message hidden">
@@ -138,11 +132,9 @@
     </div>
 
     <script>
-        // Инициализация VK Bridge
         vkBridge.send('VKWebAppInit');
-        
-        const APP_ID = 54458532;
-        
+
+        // Элементы
         const loading = document.getElementById('loading');
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
@@ -151,44 +143,37 @@
         const saveBtn = document.getElementById('saveBtn');
         const errorMessage = document.getElementById('errorMessage');
 
-        // ИСПРАВЛЕННАЯ функция получения ID сообщества
-        function getCommunityId() {
-            // Пробуем получить из pathname (как в вашем URL)
-            const pathname = window.location.pathname;
-            console.log('Pathname:', pathname);
-            
-            // Ищем паттерн /app123456_-789
-            const match = pathname.match(/\/app\d+_-(\d+)/);
-            if (match) {
-                console.log('Нашли ID в pathname:', match[1]);
-                return match[1];
-            }
-            
-            // Пробуем из параметров URL
+        // Получаем параметры из URL
+        function getUrlParams() {
             const params = new URLSearchParams(window.location.search);
-            let groupId = params.get('vk_group_id');
-            
-            if (groupId) {
-                console.log('Нашли ID в параметрах:', groupId);
-                return groupId;
+            const result = {};
+            for (const [key, value] of params) {
+                result[key] = value;
             }
-            
-            // Пробуем из hash
-            if (window.location.hash) {
-                const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                groupId = hashParams.get('vk_group_id');
-                if (groupId) {
-                    console.log('Нашли ID в hash:', groupId);
-                    return groupId;
-                }
-            }
-            
-            console.log('ID группы не найден');
-            return null;
+            console.log('Параметры URL:', result);
+            return result;
         }
 
-        // Загрузка виджета
+        // Получаем ID сообщества
+        function getCommunityId() {
+            const params = getUrlParams();
+            return params.vk_group_id;
+        }
+
+        // Проверяем, админ ли пользователь
+        function isAdmin() {
+            const params = getUrlParams();
+            const role = params.vk_viewer_group_role;
+            console.log('Роль пользователя:', role);
+            
+            // admin, editor, moderator - все могут настраивать
+            return role === 'admin' || role === 'editor' || role === 'moderator';
+        }
+
+        // Загружаем виджет
         function loadWidget(apiKey) {
+            console.log('Загружаем виджет с ключом:', apiKey);
+            
             widgetContainer.innerHTML = '';
             
             const script = document.createElement('script');
@@ -204,13 +189,14 @@
             
             widgetContainer.appendChild(script);
             
+            // Показываем виджет, прячем всё остальное
             widgetContainer.classList.remove('hidden');
             setupPanel.classList.add('hidden');
             notConfiguredMessage.classList.add('hidden');
             loading.classList.add('hidden');
         }
 
-        // Получение ключа из хранилища VK
+        // Получаем ключ из хранилища VK
         async function getApiKey() {
             const communityId = getCommunityId();
             if (!communityId) return null;
@@ -223,21 +209,16 @@
                 if (result.keys && result.keys[0] && result.keys[0].value) {
                     return result.keys[0].value;
                 }
-                return null;
             } catch (error) {
                 console.error('Ошибка получения ключа:', error);
-                return null;
             }
+            return null;
         }
 
-        // Сохранение ключа
+        // Сохраняем ключ
         async function saveApiKey(apiKey) {
             const communityId = getCommunityId();
-            if (!communityId) {
-                errorMessage.textContent = 'Не удалось определить ID сообщества';
-                errorMessage.classList.remove('hidden');
-                return false;
-            }
+            if (!communityId) return false;
             
             try {
                 await vkBridge.send('VKWebAppStorageSet', {
@@ -251,104 +232,79 @@
             }
         }
 
-        // Проверка прав администратора
-        async function checkIsAdmin() {
-            const communityId = getCommunityId();
-            if (!communityId) return false;
-            
-            try {
-                const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
-                    app_id: APP_ID,
-                    group_id: communityId,
-                    scope: 'wall'
-                });
-                
-                return !!(tokenData && tokenData.access_token);
-            } catch (error) {
-                console.log('Не админ:', error);
-                return false;
-            }
-        }
-
-        // Инициализация
+        // Основная функция
         async function init() {
-            console.log('🚀 Инициализация...');
+            console.log('Инициализация...');
             
             const communityId = getCommunityId();
-            console.log('Community ID:', communityId);
+            console.log('ID сообщества:', communityId);
             
             if (!communityId) {
                 loading.classList.add('hidden');
-                notConfiguredMessage.querySelector('p').textContent = 'Ошибка определения сообщества';
+                notConfiguredMessage.querySelector('p').textContent = 'Ошибка: приложение должно быть открыто в сообществе';
                 notConfiguredMessage.classList.remove('hidden');
                 return;
             }
             
             // Проверяем сохраненный ключ
             const savedKey = await getApiKey();
-            console.log('Saved key:', savedKey ? 'есть' : 'нет');
+            console.log('Сохраненный ключ:', savedKey ? 'есть' : 'нет');
             
             if (savedKey) {
                 loadWidget(savedKey);
                 return;
             }
             
-            // Проверяем права
-            const isAdmin = await checkIsAdmin();
-            console.log('Is admin:', isAdmin);
+            // Проверяем, админ ли пользователь
+            const admin = isAdmin();
+            console.log('Пользователь админ:', admin);
             
-            if (isAdmin) {
+            if (admin) {
+                // Админ - показываем панель ввода
+                console.log('Показываем панель ввода админу');
                 loading.classList.add('hidden');
                 setupPanel.classList.remove('hidden');
             } else {
+                // Обычный пользователь - сообщение о настройке
+                console.log('Показываем сообщение о настройке');
                 loading.classList.add('hidden');
                 notConfiguredMessage.classList.remove('hidden');
             }
         }
 
-        // Обработчики
+        // Обработчик сохранения
         saveBtn.addEventListener('click', async () => {
             const apiKey = apiKeyInput.value.trim();
             
             if (!apiKey) {
+                errorMessage.style.display = 'block';
                 errorMessage.textContent = 'Введите API ключ';
-                errorMessage.classList.remove('hidden');
                 return;
             }
             
+            errorMessage.style.display = 'none';
             saveBtn.disabled = true;
             saveBtn.textContent = 'Сохранение...';
-            errorMessage.classList.add('hidden');
             
             const success = await saveApiKey(apiKey);
             
             if (success) {
                 loadWidget(apiKey);
             } else {
+                errorMessage.style.display = 'block';
                 errorMessage.textContent = 'Ошибка сохранения';
-                errorMessage.classList.remove('hidden');
                 saveBtn.disabled = false;
                 saveBtn.textContent = 'Сохранить';
             }
         });
 
+        // Enter для сохранения
         apiKeyInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') saveBtn.click();
         });
 
-        // Запуск
+        // Запускаем
         init();
-
-        // Отладка
-        window.test = {
-            getCommunityId: getCommunityId,
-            checkAdmin: checkIsAdmin,
-            showPanel: () => {
-                loading.classList.add('hidden');
-                setupPanel.classList.remove('hidden');
-                notConfiguredMessage.classList.add('hidden');
-            }
-        };
     </script>
 </body>
 </html>
