@@ -105,6 +105,26 @@
             padding: 50px;
             color: #666;
         }
+
+        .auth-message {
+            max-width: 400px;
+            margin: 50px auto;
+            background: #e3f2fd;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .auth-btn {
+            background: #3f8ae0;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
     </style>
 </head>
 <body>
@@ -115,7 +135,7 @@
     <div id="setupPanel" class="setup-panel hidden">
         <h2>🔑 Настройка приложения</h2>
         <p>Введите API ключ вашего фитнес-клуба</p>
-        <input type="text" id="apiKeyInput" placeholder="Например: 42e1e4d1-499e-4154-a343-c50637c858c5">
+        <input type="text" id="apiKeyInput" placeholder="API ключ">
         <button id="saveBtn">Сохранить</button>
         <div id="errorMessage" style="color: red; margin-top: 10px; display: none;"></div>
     </div>
@@ -123,6 +143,12 @@
     <div id="notConfiguredMessage" class="info-message hidden">
         <h2>⏳ Приложение настраивается</h2>
         <p>Расписание появится здесь после настройки администратором сообщества</p>
+    </div>
+
+    <div id="authMessage" class="auth-message hidden">
+        <h2>🔐 Требуется авторизация</h2>
+        <p>Для доступа к расписанию нужно разрешить приложению доступ к данным</p>
+        <button id="authBtn" class="auth-btn">Разрешить доступ</button>
     </div>
 
     <div id="widget-container" class="hidden"></div>
@@ -139,19 +165,20 @@
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
         const notConfiguredMessage = document.getElementById('notConfiguredMessage');
+        const authMessage = document.getElementById('authMessage');
+        const authBtn = document.getElementById('authBtn');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
         const errorMessage = document.getElementById('errorMessage');
 
+        // ID приложения
+        const APP_ID = 54458532;
+
         // ========== ПОЛУЧЕНИЕ ID ГРУППЫ ==========
         function getCommunityId() {
-            // Из пути (например /app54458532_-203532063)
             const match = window.location.pathname.match(/\/app\d+_-(\d+)/);
-            if (match) {
-                return match[1];
-            }
+            if (match) return match[1];
             
-            // Из параметров (на всякий случай)
             const params = new URLSearchParams(window.location.search);
             return params.get('vk_group_id');
         }
@@ -183,10 +210,29 @@
             widgetContainer.classList.remove('hidden');
             setupPanel.classList.add('hidden');
             notConfiguredMessage.classList.add('hidden');
+            authMessage.classList.add('hidden');
             loading.classList.add('hidden');
         }
 
-        // ========== РАБОТА С ХРАНИЛИЩЕМ ==========
+        // ========== АВТОРИЗАЦИЯ ПОЛЬЗОВАТЕЛЯ ==========
+        async function authorizeUser() {
+            try {
+                const authResult = await vkBridge.send('VKWebAppGetAuthToken', {
+                    app_id: APP_ID,
+                    scope: 'storage'
+                });
+                
+                if (authResult.access_token) {
+                    console.log('✅ Пользователь авторизован');
+                    return true;
+                }
+            } catch (error) {
+                console.log('❌ Ошибка авторизации:', error);
+            }
+            return false;
+        }
+
+        // ========== ПОЛУЧЕНИЕ КЛЮЧА ==========
         async function getApiKey() {
             const communityId = getCommunityId();
             if (!communityId) return null;
@@ -199,10 +245,17 @@
                 if (result.keys && result.keys[0] && result.keys[0].value) {
                     return result.keys[0].value;
                 }
-            } catch (e) {}
+            } catch (error) {
+                console.log('Ошибка получения ключа:', error);
+                // Если ошибка доступа, показываем кнопку авторизации
+                if (error.error_type === 'client_error') {
+                    return 'NEED_AUTH';
+                }
+            }
             return null;
         }
 
+        // ========== СОХРАНЕНИЕ КЛЮЧА ==========
         async function saveApiKey(apiKey) {
             const communityId = getCommunityId();
             if (!communityId) return false;
@@ -213,7 +266,8 @@
                     value: apiKey
                 });
                 return true;
-            } catch (e) {
+            } catch (error) {
+                console.error('Ошибка сохранения:', error);
                 return false;
             }
         }
@@ -229,20 +283,57 @@
                 return;
             }
             
+            // Пробуем получить ключ
             const savedKey = await getApiKey();
+            console.log('Результат получения ключа:', savedKey);
             
-            if (savedKey) {
+            if (savedKey && savedKey !== 'NEED_AUTH') {
                 loadWidget(savedKey);
+            } else if (savedKey === 'NEED_AUTH') {
+                // Нужна авторизация
+                loading.classList.add('hidden');
+                authMessage.classList.remove('hidden');
             } else if (isAdmin()) {
+                // Ключа нет, но пользователь админ
                 loading.classList.add('hidden');
                 setupPanel.classList.remove('hidden');
             } else {
+                // Ключа нет, пользователь не админ
                 loading.classList.add('hidden');
                 notConfiguredMessage.classList.remove('hidden');
             }
         })();
 
-        // ========== СОХРАНЕНИЕ ==========
+        // ========== ОБРАБОТЧИК АВТОРИЗАЦИИ ==========
+        authBtn.addEventListener('click', async () => {
+            authBtn.disabled = true;
+            authBtn.textContent = 'Авторизация...';
+            
+            const authorized = await authorizeUser();
+            
+            if (authorized) {
+                // После авторизации пробуем снова получить ключ
+                const savedKey = await getApiKey();
+                if (savedKey) {
+                    loadWidget(savedKey);
+                } else {
+                    // Если ключа нет, проверяем админа
+                    if (isAdmin()) {
+                        setupPanel.classList.remove('hidden');
+                        authMessage.classList.add('hidden');
+                    } else {
+                        notConfiguredMessage.classList.remove('hidden');
+                        authMessage.classList.add('hidden');
+                    }
+                }
+            } else {
+                authBtn.disabled = false;
+                authBtn.textContent = 'Разрешить доступ';
+                alert('Не удалось авторизоваться');
+            }
+        });
+
+        // ========== СОХРАНЕНИЕ КЛЮЧА АДМИНОМ ==========
         saveBtn.addEventListener('click', async () => {
             const apiKey = apiKeyInput.value.trim();
             
@@ -272,13 +363,12 @@
             if (e.key === 'Enter') saveBtn.click();
         });
 
-        // ========== КНОПКА ДЛЯ ТЕСТА ==========
-        // Просто нажмите эту кнопку в консоли, если панель не появилась
+        // Отладка
         window.forceSetup = function() {
             loading.classList.add('hidden');
             setupPanel.classList.remove('hidden');
             notConfiguredMessage.classList.add('hidden');
-            console.log('✅ Панель ввода принудительно показана');
+            authMessage.classList.add('hidden');
         };
     </script>
 </body>
