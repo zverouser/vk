@@ -146,6 +146,9 @@
         // Инициализация VK Bridge
         vkBridge.send('VKWebAppInit');
         
+        // ID вашего приложения VK (замените на свой)
+        const APP_ID = 54458532; // ВАЖНО: замените на ID вашего приложения!
+        
         // Получаем элементы
         const loading = document.getElementById('loading');
         const setupPanel = document.getElementById('setupPanel');
@@ -197,7 +200,7 @@
             }
         }
         
-        // Упрощенная проверка прав администратора
+        // Проверка прав администратора через получение токена сообщества
         async function checkIsAdmin() {
             try {
                 const communityId = getCommunityId();
@@ -207,65 +210,25 @@
                     return false;
                 }
                 
-                // Получаем информацию о пользователе
-                const userInfo = await getUserInfo();
-                if (!userInfo) return false;
+                console.log('Проверяем права для сообщества:', communityId);
                 
-                console.log('Проверяем права для пользователя:', userInfo.id);
+                // Пробуем получить токен сообщества
+                // Это сработает ТОЛЬКО если пользователь - администратор
+                const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
+                    app_id: APP_ID,
+                    group_id: communityId
+                });
                 
-                // Используем VK Bridge для проверки прав через VKWebAppGetGroupInfo
-                try {
-                    const groupInfo = await vkBridge.send('VKWebAppGetGroupInfo', {
-                        group_id: communityId
-                    });
-                    
-                    console.log('Информация о группе:', groupInfo);
-                    
-                    // Проверяем, является ли пользователь администратором
-                    // В groupInfo может быть поле is_admin или role
-                    if (groupInfo.is_admin === true || groupInfo.role === 'admin' || groupInfo.role === 'editor') {
-                        return true;
-                    }
-                    
-                    // Альтернативный способ: пробуем получить токен сообщества
-                    try {
-                        const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
-                            app_id: 54458532, // ID вашего приложения
-                            group_id: communityId
-                        });
-                        
-                        if (tokenData && tokenData.access_token) {
-                            console.log('Токен получен - пользователь администратор');
-                            return true;
-                        }
-                    } catch (tokenError) {
-                        console.log('Не удалось получить токен - пользователь не администратор');
-                    }
-                    
-                    return false;
-                } catch (groupError) {
-                    console.error('Ошибка получения информации о группе:', groupError);
-                    
-                    // Если не удалось получить информацию о группе,
-                    // пробуем через VKWebAppGetCommunityToken
-                    try {
-                        const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
-                            app_id: 54458532, // ID вашего приложения
-                            group_id: communityId
-                        });
-                        
-                        if (tokenData && tokenData.access_token) {
-                            console.log('Токен получен - пользователь администратор');
-                            return true;
-                        }
-                    } catch (tokenError) {
-                        console.log('Не удалось получить токен - пользователь не администратор');
-                    }
-                    
+                if (tokenData && tokenData.access_token) {
+                    console.log('Токен получен - пользователь администратор');
+                    return true;
+                } else {
+                    console.log('Токен не получен - пользователь не администратор');
                     return false;
                 }
             } catch (error) {
-                console.error('Ошибка проверки прав:', error);
+                // Ошибка означает, что пользователь не администратор
+                console.log('Ошибка получения токена - пользователь не администратор:', error);
                 return false;
             }
         }
@@ -313,6 +276,8 @@
                 // Проверяем, открыто ли приложение в сообществе
                 const communityId = getCommunityId();
                 
+                console.log('Community ID:', communityId);
+                
                 if (!communityId) {
                     loading.classList.add('hidden');
                     notConfiguredMessage.querySelector('h2').textContent = '❌ Ошибка';
@@ -320,8 +285,6 @@
                     notConfiguredMessage.classList.remove('hidden');
                     return;
                 }
-                
-                console.log('Community ID:', communityId);
                 
                 // Получаем сохраненный ключ
                 const savedKey = await getApiKeyFromCommunity();
@@ -331,33 +294,30 @@
                     // Ключ есть - показываем виджет всем
                     console.log('Ключ найден, загружаем виджет');
                     loadWidget(savedKey);
-                } else {
-                    // Ключа нет - проверяем права
-                    console.log('Ключ не найден, проверяем права');
-                    
-                    // Показываем индикатор загрузки
-                    loading.classList.remove('hidden');
-                    
-                    const isAdmin = await checkIsAdmin();
-                    console.log('Результат проверки прав:', isAdmin);
-                    
-                    loading.classList.add('hidden');
-                    
-                    if (isAdmin) {
-                        // Админ - показываем панель ввода
-                        console.log('Пользователь админ, показываем панель ввода');
-                        setupPanel.classList.remove('hidden');
-                    } else {
-                        // Обычный пользователь - показываем сообщение
-                        console.log('Обычный пользователь, показываем сообщение о настройке');
-                        notConfiguredMessage.classList.remove('hidden');
-                    }
+                    return;
                 }
+                
+                // Ключа нет - проверяем права через токен
+                console.log('Ключ не найден, проверяем права');
+                
+                const isAdmin = await checkIsAdmin();
+                console.log('Результат проверки прав:', isAdmin);
+                
+                if (isAdmin) {
+                    // Админ - показываем панель ввода
+                    console.log('Пользователь админ, показываем панель ввода');
+                    loading.classList.add('hidden');
+                    setupPanel.classList.remove('hidden');
+                } else {
+                    // Обычный пользователь - показываем сообщение
+                    console.log('Обычный пользователь, показываем сообщение о настройке');
+                    loading.classList.add('hidden');
+                    notConfiguredMessage.classList.remove('hidden');
+                }
+                
             } catch (error) {
                 console.error('Ошибка инициализации:', error);
                 loading.classList.add('hidden');
-                
-                // В случае ошибки показываем сообщение о настройке
                 notConfiguredMessage.classList.remove('hidden');
             }
         }
@@ -397,24 +357,29 @@
         // Запускаем приложение
         initApp();
         
-        // Добавляем отладочные функции в консоль
+        // Добавляем отладочные функции
         window.debug = {
             showPanel: function() {
                 loading.classList.add('hidden');
                 setupPanel.classList.remove('hidden');
                 notConfiguredMessage.classList.add('hidden');
             },
-            checkAdmin: checkIsAdmin,
-            getCommunityId: getCommunityId,
-            forceReset: function() {
-                const communityId = getCommunityId();
-                vkBridge.send('VKWebAppStorageSet', {
-                    key: 'api_key_' + communityId,
-                    value: ''
-                }).then(() => {
-                    console.log('Ключ сброшен, перезагрузите страницу');
-                    location.reload();
+            checkAdmin: function() {
+                return checkIsAdmin().then(result => {
+                    console.log('Результат проверки:', result);
+                    return result;
                 });
+            },
+            forceReset: async function() {
+                const communityId = getCommunityId();
+                if (communityId) {
+                    await vkBridge.send('VKWebAppStorageSet', {
+                        key: 'api_key_' + communityId,
+                        value: ''
+                    });
+                    console.log('Ключ сброшен, перезагружаем...');
+                    location.reload();
+                }
             }
         };
     </script>
