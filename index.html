@@ -146,8 +146,8 @@
     </div>
 
     <div id="authMessage" class="auth-message hidden">
-        <h2>🔐 Требуется авторизация</h2>
-        <p>Для доступа к расписанию нужно разрешить приложению доступ к данным</p>
+        <h2>🔐 Требуется разрешение</h2>
+        <p>Для просмотра расписания нажмите кнопку ниже</p>
         <button id="authBtn" class="auth-btn">Разрешить доступ</button>
     </div>
 
@@ -158,7 +158,10 @@
     </div>
 
     <script>
-        vkBridge.send('VKWebAppInit');
+        // Инициализация
+        vkBridge.send('VKWebAppInit').then(() => {
+            console.log('VK Bridge инициализирован');
+        });
 
         // Элементы
         const loading = document.getElementById('loading');
@@ -171,26 +174,22 @@
         const saveBtn = document.getElementById('saveBtn');
         const errorMessage = document.getElementById('errorMessage');
 
-        // ID приложения
         const APP_ID = 54458532;
 
-        // ========== ПОЛУЧЕНИЕ ID ГРУППЫ ==========
+        // Получение ID группы
         function getCommunityId() {
             const match = window.location.pathname.match(/\/app\d+_-(\d+)/);
-            if (match) return match[1];
-            
-            const params = new URLSearchParams(window.location.search);
-            return params.get('vk_group_id');
+            return match ? match[1] : null;
         }
 
-        // ========== ПРОВЕРКА АДМИНА ==========
+        // Проверка прав
         function isAdmin() {
             const params = new URLSearchParams(window.location.search);
             const role = params.get('vk_viewer_group_role');
             return role === 'admin' || role === 'editor';
         }
 
-        // ========== ЗАГРУЗКА ВИДЖЕТА ==========
+        // Загрузка виджета
         function loadWidget(apiKey) {
             widgetContainer.innerHTML = '';
             
@@ -214,25 +213,21 @@
             loading.classList.add('hidden');
         }
 
-        // ========== АВТОРИЗАЦИЯ ПОЛЬЗОВАТЕЛЯ ==========
+        // Авторизация пользователя
         async function authorizeUser() {
             try {
-                const authResult = await vkBridge.send('VKWebAppGetAuthToken', {
+                const result = await vkBridge.send('VKWebAppGetAuthToken', {
                     app_id: APP_ID,
                     scope: 'storage'
                 });
-                
-                if (authResult.access_token) {
-                    console.log('✅ Пользователь авторизован');
-                    return true;
-                }
+                return !!result.access_token;
             } catch (error) {
-                console.log('❌ Ошибка авторизации:', error);
+                console.log('Ошибка авторизации:', error);
+                return false;
             }
-            return false;
         }
 
-        // ========== ПОЛУЧЕНИЕ КЛЮЧА ==========
+        // Получение ключа
         async function getApiKey() {
             const communityId = getCommunityId();
             if (!communityId) return null;
@@ -245,17 +240,14 @@
                 if (result.keys && result.keys[0] && result.keys[0].value) {
                     return result.keys[0].value;
                 }
+                return null;
             } catch (error) {
-                console.log('Ошибка получения ключа:', error);
-                // Если ошибка доступа, показываем кнопку авторизации
-                if (error.error_type === 'client_error') {
-                    return 'NEED_AUTH';
-                }
+                console.log('Ошибка доступа к хранилищу:', error);
+                return 'NEED_AUTH';
             }
-            return null;
         }
 
-        // ========== СОХРАНЕНИЕ КЛЮЧА ==========
+        // Сохранение ключа
         async function saveApiKey(apiKey) {
             const communityId = getCommunityId();
             if (!communityId) return false;
@@ -272,9 +264,10 @@
             }
         }
 
-        // ========== ЗАПУСК ==========
+        // Основная логика
         (async function() {
             const communityId = getCommunityId();
+            console.log('ID группы:', communityId);
             
             if (!communityId) {
                 loading.classList.add('hidden');
@@ -283,18 +276,18 @@
                 return;
             }
             
-            // Пробуем получить ключ
             const savedKey = await getApiKey();
-            console.log('Результат получения ключа:', savedKey);
+            console.log('Ключ:', savedKey);
             
             if (savedKey && savedKey !== 'NEED_AUTH') {
+                // Ключ есть - показываем расписание
                 loadWidget(savedKey);
             } else if (savedKey === 'NEED_AUTH') {
                 // Нужна авторизация
                 loading.classList.add('hidden');
                 authMessage.classList.remove('hidden');
             } else if (isAdmin()) {
-                // Ключа нет, но пользователь админ
+                // Ключа нет, пользователь админ
                 loading.classList.add('hidden');
                 setupPanel.classList.remove('hidden');
             } else {
@@ -304,7 +297,7 @@
             }
         })();
 
-        // ========== ОБРАБОТЧИК АВТОРИЗАЦИИ ==========
+        // Кнопка авторизации
         authBtn.addEventListener('click', async () => {
             authBtn.disabled = true;
             authBtn.textContent = 'Авторизация...';
@@ -312,12 +305,12 @@
             const authorized = await authorizeUser();
             
             if (authorized) {
-                // После авторизации пробуем снова получить ключ
+                // После авторизации пробуем получить ключ
                 const savedKey = await getApiKey();
-                if (savedKey) {
+                if (savedKey && savedKey !== 'NEED_AUTH') {
                     loadWidget(savedKey);
                 } else {
-                    // Если ключа нет, проверяем админа
+                    // Если ключа нет
                     if (isAdmin()) {
                         setupPanel.classList.remove('hidden');
                         authMessage.classList.add('hidden');
@@ -329,11 +322,10 @@
             } else {
                 authBtn.disabled = false;
                 authBtn.textContent = 'Разрешить доступ';
-                alert('Не удалось авторизоваться');
             }
         });
 
-        // ========== СОХРАНЕНИЕ КЛЮЧА АДМИНОМ ==========
+        // Сохранение ключа админом
         saveBtn.addEventListener('click', async () => {
             const apiKey = apiKeyInput.value.trim();
             
@@ -362,14 +354,6 @@
         apiKeyInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') saveBtn.click();
         });
-
-        // Отладка
-        window.forceSetup = function() {
-            loading.classList.add('hidden');
-            setupPanel.classList.remove('hidden');
-            notConfiguredMessage.classList.add('hidden');
-            authMessage.classList.add('hidden');
-        };
     </script>
 </body>
 </html>
