@@ -4,189 +4,210 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Запись в фитнес-клуб</title>
-    
-    <!-- VK Bridge для работы в ВК -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
-    
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #f5f5f5;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+        body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
         }
-        
-        #widget-container {
-            flex: 1 0 auto;
-            width: 100%;
-        }
-        
-        .footer {
-            flex-shrink: 0;
-            text-align: center;
-            padding: 12px 0;
-            font-size: 13px;
-            color: #818c99;
-            background: #ffffff;
-            border-top: 1px solid #e7e8ec;
-        }
-        
-        .footer a {
-            color: #3f8ae0;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        
-        .setup-panel {
+        .container {
             max-width: 400px;
             margin: 50px auto;
             background: white;
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
         }
-        
-        .setup-panel h2 {
-            margin: 0 0 10px;
-            color: #333;
+        button { 
+            padding: 12px 20px; 
+            margin: 5px 0; 
+            cursor: pointer;
+            width: 100%;
+            background: #3f8ae0;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
         }
-        
-        .setup-panel p {
-            color: #666;
-            margin-bottom: 20px;
+        button:hover {
+            background: #2a6fc9;
         }
-        
-        #apiKeyInput {
+        input {
             width: 100%;
             padding: 12px;
             border: 2px solid #ddd;
             border-radius: 6px;
             font-size: 14px;
-            margin-bottom: 15px;
+            margin: 10px 0;
             box-sizing: border-box;
-            font-family: monospace;
         }
-        
-        #saveBtn {
-            background: #3f8ae0;
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            width: 100%;
-        }
-        
-        #saveBtn:hover {
-            background: #2a6fc9;
-        }
-        
         .hidden {
             display: none;
         }
-
-        .info-message {
-            max-width: 400px;
-            margin: 50px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            text-align: center;
-            color: #666;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 50px;
-            color: #666;
-        }
-
-        .error-message {
-            color: #e64646;
-            margin-top: 10px;
+        .info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
             font-size: 14px;
         }
-
-        .debug-panel {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.8);
-            color: white;
+        .error {
+            background: #ffebee;
+            color: #c62828;
             padding: 10px;
-            border-radius: 5px;
-            font-size: 12px;
-            z-index: 9999;
-            cursor: pointer;
-        }
-        
-        .debug-panel:hover {
-            background: black;
+            border-radius: 6px;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
-    <!-- Индикатор загрузки -->
-    <div id="loading" class="loading">
-        ⏳ Загрузка...
-    </div>
+    <div class="container">
+        <h2 style="text-align: center;">🏋️ Фитнес-клуб</h2>
+        
+        <div id="loading">
+            <p style="text-align: center;">⏳ Загрузка...</p>
+        </div>
+        
+        <div id="setupPanel" class="hidden">
+            <h3>🔑 Настройка приложения</h3>
+            <p>Введите API ключ вашего фитнес-клуба:</p>
+            <input type="text" id="apiKeyInput" placeholder="API ключ">
+            <button id="saveBtn">Сохранить</button>
+        </div>
 
-    <!-- Панель для ввода ключа (только для админа) -->
-    <div id="setupPanel" class="setup-panel hidden">
-        <h2>🔑 Настройка приложения</h2>
-        <p>Введите API ключ вашего фитнес-клуба</p>
-        <input type="text" id="apiKeyInput" placeholder="Например: 42e1e4d1-499e-4154-a343-c50637c858c5">
-        <button id="saveBtn">Сохранить</button>
-        <div id="errorMessage" class="error-message hidden"></div>
-    </div>
+        <div id="messagePanel" class="hidden">
+            <p>⏳ Приложение настраивается администратором сообщества</p>
+        </div>
 
-    <!-- Сообщение для обычных пользователей, если ключ не настроен -->
-    <div id="notConfiguredMessage" class="info-message hidden">
-        <h2>⏳ Приложение настраивается</h2>
-        <p>Расписание появится здесь после настройки администратором сообщества</p>
-    </div>
+        <div id="widgetContainer" class="hidden">
+            <!-- Здесь будет виджет -->
+        </div>
 
-    <!-- Основной контейнер для виджета -->
-    <div id="widget-container" class="hidden"></div>
-    
-    <div class="footer">
-        Работает на <a href="https://www.fitness1c.ru/schedule_record" target="_blank" rel="noopener noreferrer">1С Фитнес клуб</a>
-    </div>
-
-    <!-- Отладочная панель (будет видна всегда) -->
-    <div id="debugPanel" class="debug-panel" onclick="debug.forceShowPanel()">
-        🔧 Отладка: показать панель ввода
+        <hr style="margin: 20px 0;">
+        
+        <h4>🛠️ Отладка</h4>
+        <button id="testAdminBtn">1. Проверить права администратора</button>
+        <button id="showSetupBtn">2. Показать панель ввода (временно)</button>
+        <button id="resetKeyBtn">3. Сбросить ключ</button>
+        
+        <div id="debugInfo" class="info hidden"></div>
+        <div id="errorInfo" class="error hidden"></div>
     </div>
 
     <script>
         // Инициализация VK Bridge
         vkBridge.send('VKWebAppInit');
         
-        // ID вашего приложения VK
-        const APP_ID = 54458532; // Ваш APP_ID
+        // ID вашего приложения
+        const APP_ID = 54458532;
         
         // Получаем элементы
         const loading = document.getElementById('loading');
         const setupPanel = document.getElementById('setupPanel');
-        const widgetContainer = document.getElementById('widget-container');
-        const notConfiguredMessage = document.getElementById('notConfiguredMessage');
+        const messagePanel = document.getElementById('messagePanel');
+        const widgetContainer = document.getElementById('widgetContainer');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
-        const errorMessage = document.getElementById('errorMessage');
-        const debugPanel = document.getElementById('debugPanel');
+        const testAdminBtn = document.getElementById('testAdminBtn');
+        const showSetupBtn = document.getElementById('showSetupBtn');
+        const resetKeyBtn = document.getElementById('resetKeyBtn');
+        const debugInfo = document.getElementById('debugInfo');
+        const errorInfo = document.getElementById('errorInfo');
         
-        // Функция для загрузки виджета
+        // Получаем ID сообщества из URL
+        function getCommunityId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('vk_group_id');
+        }
+        
+        // Показать отладочную информацию
+        function showDebug(message) {
+            debugInfo.textContent = message;
+            debugInfo.classList.remove('hidden');
+            setTimeout(() => debugInfo.classList.add('hidden'), 5000);
+        }
+        
+        // Показать ошибку
+        function showError(message) {
+            errorInfo.textContent = message;
+            errorInfo.classList.remove('hidden');
+        }
+        
+        // Проверка прав администратора
+        async function checkIsAdmin() {
+            const communityId = getCommunityId();
+            
+            if (!communityId) {
+                showError('Приложение не в сообществе');
+                return false;
+            }
+            
+            showDebug('Проверяем права для группы ' + communityId + '...');
+            
+            try {
+                const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
+                    app_id: APP_ID,
+                    group_id: communityId,
+                    scope: 'wall'
+                });
+                
+                console.log('Ответ VK:', tokenData);
+                
+                if (tokenData && tokenData.access_token) {
+                    showDebug('✅ Вы администратор!');
+                    return true;
+                } else {
+                    showDebug('❌ Вы не администратор');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Ошибка:', error);
+                showDebug('❌ Ошибка: ' + error.error_type);
+                showError('Детали: ' + JSON.stringify(error));
+                return false;
+            }
+        }
+        
+        // Сохранить ключ
+        async function saveApiKey(apiKey) {
+            const communityId = getCommunityId();
+            
+            try {
+                await vkBridge.send('VKWebAppStorageSet', {
+                    key: 'api_key_' + communityId,
+                    value: apiKey
+                });
+                return true;
+            } catch (error) {
+                console.error('Ошибка сохранения:', error);
+                return false;
+            }
+        }
+        
+        // Получить ключ
+        async function getApiKey() {
+            const communityId = getCommunityId();
+            
+            try {
+                const result = await vkBridge.send('VKWebAppStorageGet', {
+                    keys: ['api_key_' + communityId]
+                });
+                
+                if (result.keys && result.keys[0] && result.keys[0].value) {
+                    return result.keys[0].value;
+                }
+                return null;
+            } catch (error) {
+                console.error('Ошибка получения ключа:', error);
+                return null;
+            }
+        }
+        
+        // Загрузить виджет
         function loadWidget(apiKey) {
-            // Очищаем контейнер
             widgetContainer.innerHTML = '';
             
-            // Создаем скрипт с API ключом
             const script = document.createElement('script');
             script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
             script.setAttribute('data-fit-apikey', apiKey);
@@ -200,262 +221,91 @@
             
             widgetContainer.appendChild(script);
             
-            // Показываем виджет, скрываем всё остальное
+            // Показываем виджет
             widgetContainer.classList.remove('hidden');
             setupPanel.classList.add('hidden');
-            notConfiguredMessage.classList.add('hidden');
+            messagePanel.classList.add('hidden');
             loading.classList.add('hidden');
         }
         
-        // Получаем ID сообщества из URL
-        function getCommunityId() {
-            const params = new URLSearchParams(window.location.search);
-            return params.get('vk_group_id');
-        }
-        
-        // Получаем информацию о пользователе
-        async function getUserInfo() {
-            try {
-                const userInfo = await vkBridge.send('VKWebAppGetUserInfo');
-                console.log('Информация о пользователе:', userInfo);
-                return userInfo;
-            } catch (error) {
-                console.error('Ошибка получения информации о пользователе:', error);
-                return null;
-            }
-        }
-        
-        // Проверка прав администратора через получение токена сообщества
-        async function checkIsAdmin() {
-            try {
-                const communityId = getCommunityId();
-                
-                if (!communityId) {
-                    console.log('❌ Приложение открыто не в сообществе');
-                    return false;
-                }
-                
-                console.log('🔍 Проверяем права для сообщества:', communityId);
-                console.log('🔍 APP_ID:', APP_ID);
-                
-                // Пробуем получить токен сообщества
-                const tokenData = await vkBridge.send('VKWebAppGetCommunityToken', {
-                    app_id: APP_ID,
-                    group_id: communityId,
-                    scope: 'wall,photos,groups' // Запрашиваем права
-                });
-                
-                console.log('✅ Токен получен:', tokenData ? 'успешно' : 'пустой');
-                
-                if (tokenData && tokenData.access_token) {
-                    console.log('✅ Пользователь администратор!');
-                    return true;
-                } else {
-                    console.log('❌ Токен не содержит access_token');
-                    return false;
-                }
-            } catch (error) {
-                // Ошибка означает, что пользователь не администратор
-                console.log('❌ Ошибка получения токена:', error);
-                console.log('❌ Детали ошибки:', JSON.stringify(error));
-                return false;
-            }
-        }
-        
-        // Сохраняем API ключ в хранилище сообщества
-        async function saveApiKeyToCommunity(apiKey) {
-            try {
-                const communityId = getCommunityId();
-                
-                await vkBridge.send('VKWebAppStorageSet', {
-                    key: 'api_key_' + communityId,
-                    value: apiKey
-                });
-                
-                console.log('✅ Ключ сохранен в хранилище VK');
-                return true;
-            } catch (error) {
-                console.error('❌ Ошибка сохранения ключа:', error);
-                return false;
-            }
-        }
-        
-        // Получаем API ключ из хранилища сообщества
-        async function getApiKeyFromCommunity() {
-            try {
-                const communityId = getCommunityId();
-                
-                const result = await vkBridge.send('VKWebAppStorageGet', {
-                    keys: ['api_key_' + communityId]
-                });
-                
-                console.log('Результат получения ключа:', result);
-                
-                if (result.keys && result.keys.length > 0 && result.keys[0].value) {
-                    console.log('✅ Ключ найден в хранилище');
-                    return result.keys[0].value;
-                }
-                console.log('❌ Ключ не найден в хранилище');
-                return null;
-            } catch (error) {
-                console.error('❌ Ошибка получения ключа:', error);
-                return null;
-            }
-        }
-        
-        // Принудительно показать панель ввода (для отладки)
-        function forceShowSetupPanel() {
-            console.log('🔧 Принудительно показываем панель ввода');
-            loading.classList.add('hidden');
-            setupPanel.classList.remove('hidden');
-            notConfiguredMessage.classList.add('hidden');
-        }
-        
-        // Основная функция
+        // Инициализация приложения
         async function initApp() {
-            try {
-                console.log('🚀 Запуск приложения...');
-                console.log('📱 URL параметры:', window.location.search);
-                
-                // Проверяем, открыто ли приложение в сообществе
-                const communityId = getCommunityId();
-                
-                console.log('🏢 Community ID:', communityId);
-                
-                if (!communityId) {
-                    console.log('❌ Приложение открыто не в сообществе');
-                    loading.classList.add('hidden');
-                    notConfiguredMessage.querySelector('h2').textContent = '❌ Ошибка';
-                    notConfiguredMessage.querySelector('p').textContent = 'Приложение должно быть открыто в сообществе';
-                    notConfiguredMessage.classList.remove('hidden');
-                    return;
-                }
-                
-                // Получаем информацию о пользователе
-                const userInfo = await getUserInfo();
-                
-                // Получаем сохраненный ключ
-                const savedKey = await getApiKeyFromCommunity();
-                
-                if (savedKey) {
-                    // Ключ есть - показываем виджет всем
-                    console.log('✅ Ключ найден, загружаем виджет');
-                    loadWidget(savedKey);
-                    return;
-                }
-                
-                // Ключа нет - проверяем права
-                console.log('🔑 Ключ не найден, проверяем права администратора');
-                
-                const isAdmin = await checkIsAdmin();
-                console.log('📊 Результат проверки прав:', isAdmin);
-                
-                if (isAdmin) {
-                    // Админ - показываем панель ввода
-                    console.log('👑 Пользователь админ, показываем панель ввода');
-                    loading.classList.add('hidden');
-                    setupPanel.classList.remove('hidden');
-                } else {
-                    // Обычный пользователь - показываем сообщение
-                    console.log('👤 Обычный пользователь, показываем сообщение о настройке');
-                    loading.classList.add('hidden');
-                    notConfiguredMessage.classList.remove('hidden');
-                    
-                    // Для отладки показываем дополнительную информацию
-                    console.log('ℹ️ Если вы владелец, проверьте:');
-                    console.log('1. Правильно ли указан APP_ID в коде (сейчас: ' + APP_ID + ')');
-                    console.log('2. Установлено ли приложение в сообществе');
-                    console.log('3. Нажмите на кнопку "Отладка" в правом нижнем углу');
-                }
-                
-            } catch (error) {
-                console.error('❌ Критическая ошибка инициализации:', error);
+            const communityId = getCommunityId();
+            
+            if (!communityId) {
+                messagePanel.querySelector('p').textContent = '❌ Приложение должно быть открыто в сообществе';
                 loading.classList.add('hidden');
-                
-                // Показываем панель ввода для отладки
-                notConfiguredMessage.querySelector('h2').textContent = '⚠️ Ошибка загрузки';
-                notConfiguredMessage.querySelector('p').textContent = 'Произошла ошибка. Нажмите на кнопку отладки.';
-                notConfiguredMessage.classList.remove('hidden');
+                messagePanel.classList.remove('hidden');
+                return;
+            }
+            
+            console.log('ID сообщества:', communityId);
+            
+            // Проверяем сохраненный ключ
+            const savedKey = await getApiKey();
+            
+            if (savedKey) {
+                loadWidget(savedKey);
+                return;
+            }
+            
+            // Ключа нет - проверяем права
+            const isAdmin = await checkIsAdmin();
+            
+            if (isAdmin) {
+                setupPanel.classList.remove('hidden');
+                loading.classList.add('hidden');
+            } else {
+                messagePanel.classList.remove('hidden');
+                loading.classList.add('hidden');
             }
         }
         
-        // Обработчик кнопки сохранения
-        saveBtn.addEventListener('click', async function() {
+        // Обработчики кнопок
+        saveBtn.addEventListener('click', async () => {
             const apiKey = apiKeyInput.value.trim();
             
             if (apiKey) {
                 saveBtn.disabled = true;
                 saveBtn.textContent = 'Сохранение...';
-                errorMessage.classList.add('hidden');
                 
-                const success = await saveApiKeyToCommunity(apiKey);
+                const success = await saveApiKey(apiKey);
                 
                 if (success) {
                     loadWidget(apiKey);
                 } else {
-                    errorMessage.textContent = 'Ошибка при сохранении ключа';
-                    errorMessage.classList.remove('hidden');
+                    showError('Ошибка сохранения ключа');
                     saveBtn.disabled = false;
                     saveBtn.textContent = 'Сохранить';
                 }
-            } else {
-                errorMessage.textContent = 'Пожалуйста, введите API ключ';
-                errorMessage.classList.remove('hidden');
             }
         });
         
-        // Сохранение по Enter
-        apiKeyInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                saveBtn.click();
+        testAdminBtn.addEventListener('click', async () => {
+            await checkIsAdmin();
+        });
+        
+        showSetupBtn.addEventListener('click', () => {
+            setupPanel.classList.remove('hidden');
+            messagePanel.classList.add('hidden');
+            loading.classList.add('hidden');
+            showDebug('Панель ввода показана принудительно');
+        });
+        
+        resetKeyBtn.addEventListener('click', async () => {
+            const communityId = getCommunityId();
+            if (communityId) {
+                await vkBridge.send('VKWebAppStorageSet', {
+                    key: 'api_key_' + communityId,
+                    value: ''
+                });
+                showDebug('Ключ сброшен, перезагрузите страницу');
+                setTimeout(() => location.reload(), 2000);
             }
         });
         
-        // Запускаем приложение
+        // Запускаем
         initApp();
-        
-        // Отладочные функции
-        window.debug = {
-            forceShowPanel: forceShowSetupPanel,
-            checkAdmin: function() {
-                return checkIsAdmin().then(result => {
-                    console.log('Результат проверки:', result);
-                    alert('Результат проверки прав: ' + (result ? 'Вы администратор' : 'Вы не администратор'));
-                    return result;
-                });
-            },
-            getCommunityId: getCommunityId,
-            getUserInfo: getUserInfo,
-            forceReset: async function() {
-                const communityId = getCommunityId();
-                if (communityId) {
-                    await vkBridge.send('VKWebAppStorageSet', {
-                        key: 'api_key_' + communityId,
-                        value: ''
-                    });
-                    console.log('Ключ сброшен, перезагружаем...');
-                    location.reload();
-                }
-            },
-            testToken: function() {
-                return vkBridge.send('VKWebAppGetCommunityToken', {
-                    app_id: APP_ID,
-                    group_id: getCommunityId(),
-                    scope: 'wall,photos,groups'
-                }).then(data => {
-                    console.log('Успех! Токен получен:', data);
-                    alert('Токен получен! Вы администратор');
-                }).catch(error => {
-                    console.log('Ошибка:', error);
-                    alert('Ошибка: ' + JSON.stringify(error));
-                });
-            }
-        };
-        
-        console.log('🛠️ Отладочные функции доступны:');
-        console.log('debug.forceShowPanel() - показать панель ввода');
-        console.log('debug.checkAdmin() - проверить права');
-        console.log('debug.testToken() - протестировать получение токена');
     </script>
 </body>
 </html>
