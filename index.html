@@ -305,149 +305,37 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ communityId, apiKey })
+                    body: JSON.stringify({ 
+                        communityId: String(communityId), 
+                        apiKey: String(apiKey) 
+                    })
                 });
                 
                 if (!response.ok) {
+                    const errorText = await response.text();
+                    addLog('Ошибка HTTP', { status: response.status, text: errorText });
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 
                 const data = await response.json();
-                addLog('Ключ сохранён', data);
-                return data.success;
+                addLog('Ответ сервера при сохранении', data);
+                
+                if (data.success) {
+                    return true;
+                } else {
+                    addLog('Сервер вернул ошибку', data.error);
+                    return false;
+                }
             } catch (error) {
                 addLog('Ошибка сохранения ключа', error);
                 return false;
             }
         }
         
-        // ===== ИСПРАВЛЕННАЯ ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА =====
+        // ===== ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА (ВРЕМЕННАЯ) =====
         async function checkIsAdmin(communityId, userId) {
-            try {
-                addLog('Проверка прав администратора', { communityId, userId });
-                
-                // Способ 1: Получаем токен пользователя и проверяем через groups.getMembers
-                try {
-                    const authResult = await vkBridge.send('VKWebAppGetAuthToken', {
-                        app_id: APP_ID,
-                        scope: 'groups'  // Запрашиваем доступ к группам
-                    });
-                    
-                    addLog('Токен получен', authResult);
-                    
-                    // Используем метод groups.getById для получения информации о группе
-                    const groupInfo = await vkBridge.send('VKWebAppCallAPIMethod', {
-                        method: 'groups.getById',
-                        params: {
-                            group_id: communityId,
-                            access_token: authResult.access_token,
-                            v: '5.199'
-                        }
-                    });
-                    
-                    addLog('Информация о группе', groupInfo);
-                    
-                    // Проверяем, является ли пользователь создателем группы
-                    if (groupInfo.response && groupInfo.response[0]) {
-                        const group = groupInfo.response[0];
-                        
-                        // Если пользователь - создатель группы
-                        if (group.id && userId == group.id) {
-                            addLog('Пользователь является создателем группы');
-                            return true;
-                        }
-                    }
-                    
-                    // Используем метод groups.isMember с расширенными параметрами
-                    const result = await vkBridge.send('VKWebAppCallAPIMethod', {
-                        method: 'groups.isMember',
-                        params: {
-                            group_id: communityId,
-                            user_id: userId,
-                            access_token: authResult.access_token,
-                            extended: 1,  // Запрашиваем расширенную информацию
-                            v: '5.199'
-                        }
-                    });
-                    
-                    addLog('Результат groups.isMember (extended)', result);
-                    
-                    // Проверяем результат
-                    if (result.response) {
-                        // Если ответ - число (просто членство)
-                        if (typeof result.response === 'number') {
-                            addLog('Ответ в виде числа, расширенная информация недоступна');
-                            return false;
-                        }
-                        
-                        // Если ответ - объект с дополнительной информацией
-                        if (result.response.member === 1) {
-                            // Проверяем права администратора
-                            if (result.response.is_admin === 1 || result.response.is_owner === 1) {
-                                addLog('Пользователь является администратором или владельцем');
-                                return true;
-                            }
-                            
-                            // Дополнительная проверка через groups.get
-                            try {
-                                const adminResult = await vkBridge.send('VKWebAppCallAPIMethod', {
-                                    method: 'groups.get',
-                                    params: {
-                                        user_id: userId,
-                                        access_token: authResult.access_token,
-                                        extended: 1,
-                                        filter: 'admin',  // Запрашиваем только группы, где пользователь админ
-                                        v: '5.199'
-                                    }
-                                });
-                                
-                                addLog('Результат groups.get (admin filter)', adminResult);
-                                
-                                if (adminResult.response && adminResult.response.items) {
-                                    const isAdminOfGroup = adminResult.response.items.some(
-                                        group => group.id == communityId
-                                    );
-                                    
-                                    if (isAdminOfGroup) {
-                                        addLog('Пользователь подтверждён как администратор через groups.get');
-                                        return true;
-                                    }
-                                }
-                            } catch (e) {
-                                addLog('Ошибка при проверке через groups.get', e);
-                            }
-                        }
-                    }
-                    
-                } catch (e) {
-                    addLog('Ошибка при проверке через токен пользователя', e);
-                }
-                
-                // Способ 2: Если ничего не помогло, пробуем самый простой метод
-                try {
-                    const simpleCheck = await vkBridge.send('VKWebAppCallAPIMethod', {
-                        method: 'groups.getMembers',
-                        params: {
-                            group_id: communityId,
-                            access_token: SERVICE_TOKEN,
-                            v: '5.199'
-                        }
-                    });
-                    
-                    addLog('Проверка через groups.getMembers', simpleCheck);
-                    // Если запрос успешен - возможно, у нас есть доступ
-                } catch (e) {
-                    addLog('Ошибка groups.getMembers', e);
-                }
-                
-                // ВРЕМЕННОЕ РЕШЕНИЕ: показываем панель настройки всем для теста
-                addLog('ВНИМАНИЕ: Используется временный режим отладки!');
-                return true; // ВРЕМЕННО считаем всех администраторами для теста
-                
-            } catch (error) {
-                addLog('Критическая ошибка проверки прав', error);
-                return false;
-            }
+            addLog('ВРЕМЕННО: считаем пользователя администратором');
+            return true; // ВРЕМЕННО считаем всех администраторами
         }
         
         // ===== ОСНОВНАЯ ФУНКЦИЯ =====
@@ -469,20 +357,9 @@
                     addLog('Ключ найден, загружаем виджет');
                     loadWidget(apiKey);
                 } else {
-                    addLog('Ключ не найден, проверяем права администратора');
-                    
-                    // Проверяем права
-                    const isAdmin = await checkIsAdmin(communityId, userData.id);
-                    addLog('Результат проверки прав', { isAdmin });
-                    
-                    if (isAdmin) {
-                        addLog('Пользователь администратор, показываем панель настройки');
-                        hideLoader();
-                        setupPanel.classList.remove('hidden');
-                    } else {
-                        addLog('Пользователь не администратор, показываем сообщение об ошибке');
-                        showError('Приложение ещё не настроено. Пожалуйста, обратитесь к администратору сообщества.', false);
-                    }
+                    addLog('Ключ не найден, показываем панель настройки (временный режим)');
+                    hideLoader();
+                    setupPanel.classList.remove('hidden');
                 }
                 
             } catch (error) {
