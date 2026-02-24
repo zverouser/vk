@@ -4,9 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Запись в фитнес-клуб</title>
+    
     <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
+    
     <style>
-        /* ... (стили можно оставить как в предыдущей версии) ... */
         body {
             margin: 0;
             padding: 0;
@@ -16,23 +17,134 @@
             flex-direction: column;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        #widget-container { flex: 1 0 auto; width: 100%; }
-        .footer { flex-shrink: 0; text-align: center; padding: 12px 0; font-size: 13px; color: #818c99; background: #ffffff; border-top: 1px solid #e7e8ec; }
-        .footer a { color: #3f8ae0; text-decoration: none; font-weight: 500; }
-        .setup-panel { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
-        .setup-panel h2 { margin: 0 0 10px; color: #333; }
-        .setup-panel p { color: #666; margin-bottom: 20px; }
-        #apiKeyInput { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; font-family: monospace; }
-        #saveBtn { background: #3f8ae0; color: white; border: none; padding: 12px 30px; border-radius: 6px; font-size: 16px; cursor: pointer; width: 100%; }
-        #saveBtn:hover { background: #2a6fc9; }
-        .hidden { display: none; }
-        .info-message { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; color: #666; }
-        .loading { text-align: center; padding: 50px; color: #666; }
-        .debug-panel { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; cursor: pointer; z-index: 9999; }
+        
+        #widget-container {
+            flex: 1 0 auto;
+            width: 100%;
+        }
+        
+        .footer {
+            flex-shrink: 0;
+            text-align: center;
+            padding: 12px 0;
+            font-size: 13px;
+            color: #818c99;
+            background: #ffffff;
+            border-top: 1px solid #e7e8ec;
+        }
+        
+        .footer a {
+            color: #3f8ae0;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .setup-panel {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .setup-panel h2 {
+            margin: 0 0 10px;
+            color: #333;
+        }
+        
+        .setup-panel p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        #apiKeyInput {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        
+        #saveBtn {
+            background: #3f8ae0;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        #saveBtn:hover {
+            background: #2a6fc9;
+        }
+        
+        .hidden {
+            display: none;
+        }
+
+        .info-message {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .auth-message {
+            max-width: 400px;
+            margin: 50px auto;
+            background: #e3f2fd;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .auth-btn {
+            background: #3f8ae0;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        .debug-panel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            z-index: 9999;
+        }
     </style>
 </head>
 <body>
-    <div id="loading" class="loading">⏳ Загрузка...</div>
+    <div id="loading" class="loading">
+        ⏳ Загрузка...
+    </div>
+
     <div id="setupPanel" class="setup-panel hidden">
         <h2>🔑 Настройка приложения</h2>
         <p>Введите API ключ вашего фитнес-клуба</p>
@@ -40,55 +152,68 @@
         <button id="saveBtn">Сохранить</button>
         <div id="errorMessage" style="color: red; margin-top: 10px; display: none;"></div>
     </div>
+
     <div id="notConfiguredMessage" class="info-message hidden">
         <h2>⏳ Приложение настраивается</h2>
         <p>Расписание появится здесь после настройки администратором сообщества</p>
     </div>
+
+    <div id="authMessage" class="auth-message hidden">
+        <h2>🔐 Требуется авторизация</h2>
+        <p>Для просмотра расписания нажмите кнопку "Разрешить доступ"</p>
+        <button id="authBtn" class="auth-btn">Разрешить доступ</button>
+    </div>
+
     <div id="widget-container" class="hidden"></div>
-    <div class="footer">Работает на <a href="https://www.fitness1c.ru/schedule_record" target="_blank" rel="noopener noreferrer">1С Фитнес клуб</a></div>
-    <div class="debug-panel" onclick="window.forceDebug()">🛠️ Отладка</div>
+    
+    <div class="footer">
+        Работает на <a href="https://www.fitness1c.ru/schedule_record" target="_blank" rel="noopener noreferrer">1С Фитнес клуб</a>
+    </div>
+
+    <div class="debug-panel" onclick="window.forceDebug()">
+        🛠️ Отладка
+    </div>
 
     <script>
         vkBridge.send('VKWebAppInit');
 
-        // Элементы DOM
+        // Элементы
         const loading = document.getElementById('loading');
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
         const notConfiguredMessage = document.getElementById('notConfiguredMessage');
+        const authMessage = document.getElementById('authMessage');
+        const authBtn = document.getElementById('authBtn');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
         const errorMessage = document.getElementById('errorMessage');
 
-        // Глобальная переменная для хранения ID группы
+        const APP_ID = 54458532;
         let communityId = null;
 
-        // ========== ПОЛУЧЕНИЕ ID ГРУППЫ ЧЕРЕЗ VK API ==========
+        // ========== ПОЛУЧЕНИЕ ID ГРУППЫ ==========
         async function fetchCommunityId() {
+            // Сначала пробуем из параметров
+            const params = new URLSearchParams(window.location.search);
+            communityId = params.get('vk_group_id');
+            
+            if (communityId) {
+                console.log('✅ ID из параметров:', communityId);
+                return true;
+            }
+            
+            // Если нет, пробуем через API
             try {
-                // Пробуем получить информацию о текущей группе
                 const groupInfo = await vkBridge.send('VKWebAppGetGroupInfo');
-                console.log('Информация о группе:', groupInfo);
-                
                 if (groupInfo && groupInfo.id) {
-                    communityId = groupInfo.id.toString().replace('-', ''); // Убираем минус, если есть
-                    console.log('✅ ID группы получен через API:', communityId);
+                    communityId = groupInfo.id.toString().replace('-', '');
+                    console.log('✅ ID через API:', communityId);
                     return true;
                 }
             } catch (error) {
-                console.log('❌ Не удалось получить группу через API:', error);
+                console.log('❌ API группы недоступно');
             }
-
-            // Запасной вариант: пытаемся получить из параметров (для администратора)
-            const params = new URLSearchParams(window.location.search);
-            const paramGroupId = params.get('vk_group_id');
-            if (paramGroupId) {
-                communityId = paramGroupId;
-                console.log('✅ ID группы получен из параметров:', communityId);
-                return true;
-            }
-
-            console.log('❌ Не удалось определить ID группы');
+            
             return false;
         }
 
@@ -103,82 +228,157 @@
         // ========== ЗАГРУЗКА ВИДЖЕТА ==========
         function loadWidget(apiKey) {
             widgetContainer.innerHTML = '';
+            
             const script = document.createElement('script');
             script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
             script.setAttribute('data-fit-apikey', apiKey);
             script.setAttribute('data-type', 'schedule');
             script.setAttribute('data-theme', 'light');
             script.setAttribute('data-settings', JSON.stringify({
-                url_data: { "club_id": "76f052aa-70d0-11ef-9cd6-00505683c1a3" }
+                url_data: {
+                    "club_id": "76f052aa-70d0-11ef-9cd6-00505683c1a3"
+                }
             }));
+            
             widgetContainer.appendChild(script);
             
             widgetContainer.classList.remove('hidden');
             setupPanel.classList.add('hidden');
             notConfiguredMessage.classList.add('hidden');
+            authMessage.classList.add('hidden');
             loading.classList.add('hidden');
         }
 
-        // ========== ПОЛУЧЕНИЕ КЛЮЧА ИЗ ХРАНИЛИЩА ==========
-        function getApiKey() {
-            if (!communityId) return null;
-            const localKey = localStorage.getItem('fit_api_key_' + communityId);
-            console.log('🔑 Ключ из localStorage:', localKey ? 'найден' : 'не найден');
-            return localKey;
-        }
-
-        // ========== СОХРАНЕНИЕ КЛЮЧА ==========
-        function saveApiKey(apiKey) {
-            if (!communityId) {
-                console.log('❌ Нет ID группы для сохранения');
+        // ========== АВТОРИЗАЦИЯ ==========
+        async function authorizeUser() {
+            try {
+                const result = await vkBridge.send('VKWebAppGetAuthToken', {
+                    app_id: APP_ID,
+                    scope: 'storage'
+                });
+                return !!result.access_token;
+            } catch (error) {
+                console.log('Ошибка авторизации:', error);
                 return false;
             }
-            localStorage.setItem('fit_api_key_' + communityId, apiKey);
-            console.log('✅ Ключ сохранен в localStorage');
-            return true;
+        }
+
+        // ========== ПОЛУЧЕНИЕ КЛЮЧА ИЗ VK STORAGE ==========
+        async function getApiKeyFromVK() {
+            if (!communityId) return null;
+            
+            try {
+                const result = await vkBridge.send('VKWebAppStorageGet', {
+                    keys: ['api_key_' + communityId]
+                });
+                
+                if (result.keys && result.keys[0] && result.keys[0].value) {
+                    console.log('✅ Ключ найден в VK Storage');
+                    return result.keys[0].value;
+                }
+            } catch (error) {
+                console.log('❌ Ошибка доступа к VK Storage:', error);
+                if (error.error_type === 'client_error') {
+                    return 'NEED_AUTH';
+                }
+            }
+            return null;
+        }
+
+        // ========== СОХРАНЕНИЕ КЛЮЧА В VK STORAGE ==========
+        async function saveApiKeyToVK(apiKey) {
+            if (!communityId) return false;
+            
+            try {
+                await vkBridge.send('VKWebAppStorageSet', {
+                    key: 'api_key_' + communityId,
+                    value: apiKey
+                });
+                console.log('✅ Ключ сохранен в VK Storage');
+                return true;
+            } catch (error) {
+                console.error('❌ Ошибка сохранения:', error);
+                return false;
+            }
         }
 
         // ========== ОСНОВНАЯ ЛОГИКА ==========
         (async function() {
             console.log('🚀 Запуск приложения');
             
-            // Сначала получаем ID группы
+            // Получаем ID группы
             const groupFound = await fetchCommunityId();
             
             if (!groupFound) {
                 loading.classList.add('hidden');
-                notConfiguredMessage.querySelector('p').textContent = 'Ошибка определения сообщества. Нажмите "Отладка"';
+                notConfiguredMessage.querySelector('p').textContent = 'Ошибка определения сообщества';
                 notConfiguredMessage.classList.remove('hidden');
                 return;
             }
             
-            // Проверяем ключ
-            const savedKey = getApiKey();
+            // Пробуем получить ключ из VK Storage
+            const vkKey = await getApiKeyFromVK();
+            console.log('🔑 Результат из VK Storage:', vkKey);
             
-            if (savedKey) {
-                loadWidget(savedKey);
+            if (vkKey && vkKey !== 'NEED_AUTH') {
+                // Ключ есть - показываем расписание
+                loadWidget(vkKey);
+            } else if (vkKey === 'NEED_AUTH') {
+                // Нужна авторизация
+                loading.classList.add('hidden');
+                authMessage.classList.remove('hidden');
             } else if (isAdmin()) {
+                // Ключа нет, пользователь админ
                 loading.classList.add('hidden');
                 setupPanel.classList.remove('hidden');
             } else {
+                // Ключа нет, пользователь не админ
                 loading.classList.add('hidden');
                 notConfiguredMessage.classList.remove('hidden');
             }
         })();
 
-        // ========== СОХРАНЕНИЕ ==========
-        saveBtn.addEventListener('click', () => {
+        // ========== КНОПКА АВТОРИЗАЦИИ ==========
+        authBtn.addEventListener('click', async () => {
+            authBtn.disabled = true;
+            authBtn.textContent = 'Авторизация...';
+            
+            const authorized = await authorizeUser();
+            
+            if (authorized) {
+                // После авторизации пробуем получить ключ
+                const vkKey = await getApiKeyFromVK();
+                if (vkKey && vkKey !== 'NEED_AUTH') {
+                    loadWidget(vkKey);
+                } else if (isAdmin()) {
+                    setupPanel.classList.remove('hidden');
+                    authMessage.classList.add('hidden');
+                } else {
+                    notConfiguredMessage.classList.remove('hidden');
+                    authMessage.classList.add('hidden');
+                }
+            } else {
+                authBtn.disabled = false;
+                authBtn.textContent = 'Разрешить доступ';
+            }
+        });
+
+        // ========== СОХРАНЕНИЕ КЛЮЧА АДМИНОМ ==========
+        saveBtn.addEventListener('click', async () => {
             const apiKey = apiKeyInput.value.trim();
+            
             if (!apiKey) {
                 errorMessage.style.display = 'block';
                 errorMessage.textContent = 'Введите API ключ';
                 return;
             }
+            
             errorMessage.style.display = 'none';
             saveBtn.disabled = true;
             saveBtn.textContent = 'Сохранение...';
             
-            const success = saveApiKey(apiKey);
+            const success = await saveApiKeyToVK(apiKey);
+            
             if (success) {
                 loadWidget(apiKey);
             } else {
@@ -196,19 +396,18 @@
         // ========== ОТЛАДКА ==========
         window.forceDebug = function() {
             console.log('=== ОТЛАДКА ===');
-            console.log('URL:', window.location.href);
-            console.log('communityId (глобальный):', communityId);
+            console.log('communityId:', communityId);
+            console.log('isAdmin:', isAdmin());
+            
             if (communityId) {
-                const key = localStorage.getItem('fit_api_key_' + communityId);
-                console.log('Ключ в localStorage:', key);
+                vkBridge.send('VKWebAppStorageGet', {
+                    keys: ['api_key_' + communityId]
+                }).then(result => {
+                    console.log('Ключ в VK Storage:', result);
+                }).catch(error => {
+                    console.log('Ошибка VK Storage:', error);
+                });
             }
-            alert(`ID группы: ${communityId || 'не определён'}\nКлюч: ${communityId ? (localStorage.getItem('fit_api_key_' + communityId) ? 'есть' : 'нет') : 'не проверялся'}`);
-        };
-
-        window.forceSetup = function() {
-            loading.classList.add('hidden');
-            setupPanel.classList.remove('hidden');
-            notConfiguredMessage.classList.add('hidden');
         };
     </script>
 </body>
