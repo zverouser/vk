@@ -160,31 +160,46 @@
         const saveBtn = document.getElementById('saveBtn');
         const errorMessage = document.getElementById('errorMessage');
 
-        const APP_ID = 54458532;
-
         // ========== УНИВЕРСАЛЬНОЕ ПОЛУЧЕНИЕ ID ГРУППЫ ==========
         function getCommunityId() {
-            // Способ 1: Из пути (самый надежный для вашего случая)
-            // URL: https://vk.com/app54458532_-229471707
+            console.log('🔍 Ищем ID группы...');
+            console.log('Полный URL:', window.location.href);
+            console.log('Pathname:', window.location.pathname);
+            
+            // Способ 1: Из пути вида /app54458532_-229471707
             const pathMatch = window.location.pathname.match(/\/app\d+_-(\d+)/);
             if (pathMatch) {
-                console.log('✅ ID из пути:', pathMatch[1]);
+                console.log('✅ ID из пути (app_):', pathMatch[1]);
                 return pathMatch[1];
             }
             
-            // Способ 2: Из параметра vk_group_id
+            // Способ 2: Из пути вида /app54458532-229471707 (без подчеркивания)
+            const pathMatch2 = window.location.pathname.match(/\/app\d+-(\d+)/);
+            if (pathMatch2) {
+                console.log('✅ ID из пути (app-):', pathMatch2[1]);
+                return pathMatch2[1];
+            }
+            
+            // Способ 3: Из параметров URL
             const params = new URLSearchParams(window.location.search);
-            const groupId = params.get('vk_group_id');
+            let groupId = params.get('vk_group_id');
             if (groupId) {
-                console.log('✅ ID из параметров:', groupId);
+                console.log('✅ ID из vk_group_id:', groupId);
                 return groupId;
             }
             
-            // Способ 3: Из параметра mid
+            // Способ 4: Из параметра mid
             const mid = params.get('mid');
             if (mid && mid.startsWith('-')) {
                 console.log('✅ ID из mid:', mid.substring(1));
                 return mid.substring(1);
+            }
+            
+            // Способ 5: Из полного URL (последняя надежда)
+            const urlMatch = window.location.href.match(/vk\.com\/app\d+[_-](\d+)/);
+            if (urlMatch) {
+                console.log('✅ ID из полного URL:', urlMatch[1]);
+                return urlMatch[1];
             }
             
             console.log('❌ ID группы не найден');
@@ -233,7 +248,6 @@
                 return null;
             }
             
-            // Пробуем получить из localStorage
             const localKey = localStorage.getItem('fit_api_key_' + communityId);
             console.log('🔑 Ключ из localStorage:', localKey ? 'найден' : 'не найден');
             
@@ -248,7 +262,6 @@
                 return false;
             }
             
-            // Сохраняем в localStorage
             localStorage.setItem('fit_api_key_' + communityId, apiKey);
             console.log('✅ Ключ сохранен в localStorage');
             
@@ -266,10 +279,8 @@
         // ========== ОСНОВНАЯ ЛОГИКА ==========
         (function() {
             console.log('🚀 Запуск приложения');
-            console.log('📍 URL:', window.location.href);
             
             const communityId = getCommunityId();
-            console.log('🏢 ID группы:', communityId);
             
             if (!communityId) {
                 loading.classList.add('hidden');
@@ -278,30 +289,16 @@
                 return;
             }
             
-            // Проверяем ключ
             const savedKey = getApiKey();
             
             if (savedKey) {
-                // Ключ есть - показываем расписание ВСЕМ
-                console.log('✅ Ключ найден, загружаем виджет');
                 loadWidget(savedKey);
+            } else if (isAdmin()) {
+                loading.classList.add('hidden');
+                setupPanel.classList.remove('hidden');
             } else {
-                // Ключа нет
-                console.log('❌ Ключ не найден');
-                
-                // Проверяем, админ ли пользователь
-                const admin = isAdmin();
-                console.log('👑 Админ:', admin);
-                
-                if (admin) {
-                    console.log('📝 Показываем панель ввода админу');
-                    loading.classList.add('hidden');
-                    setupPanel.classList.remove('hidden');
-                } else {
-                    console.log('⏳ Показываем сообщение о настройке');
-                    loading.classList.add('hidden');
-                    notConfiguredMessage.classList.remove('hidden');
-                }
+                loading.classList.add('hidden');
+                notConfiguredMessage.classList.remove('hidden');
             }
         })();
 
