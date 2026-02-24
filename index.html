@@ -142,9 +142,16 @@
     </div>
 
     <script>
-        // Инициализация VK Bridge
-        vkBridge.send('VKWebAppInit');
+        // ⚠️ ВАЖНО: ВСТАВЬТЕ СЮДА ВАШ СЕРВИСНЫЙ КЛЮЧ ИЗ VK ID
+        const SERVICE_TOKEN = '3747f79b3747f79b3747f79b8d34790f3f337473747f79b5ed0fbb904be11ce3f78097f';
         
+        // ID вашего приложения
+        const APP_ID = 54458532;
+        
+        // URL вашего Google Apps Script
+        const API_SERVER = 'https://script.google.com/macros/s/AKfycbynNJBQ-D3_CC7AFTFsM4hJtc8PSiCSzE2EZXgXpnR5-GWsnx14iqJAttwQjKdwG7MP/exec';
+        
+        // Элементы интерфейса
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
         const loader = document.getElementById('loader');
@@ -152,8 +159,8 @@
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
         
-        // ⚠️ ЗАМЕНИТЕ НА ВАШ URL ИЗ GOOGLE APPS SCRIPT
-        const API_SERVER = 'https://script.google.com/macros/s/AKfycbynNJBQ-D3_CC7AFTFsM4hJtc8PSiCSzE2EZXgXpnR5-GWsnx14iqJAttwQjKdwG7MP/exec';
+        // Инициализация VK Bridge
+        vkBridge.send('VKWebAppInit');
         
         function showLoader() {
             loader.classList.remove('hidden');
@@ -276,41 +283,25 @@
             }
         }
         
-        // НОВАЯ ФУНКЦИЯ: получение токена и проверка прав
-        async function checkIsAdmin(communityId) {
+        // 🔥 НОВАЯ ФУНКЦИЯ: проверка прав администратора через сервисный ключ
+        async function checkIsAdmin(communityId, userId) {
             try {
-                // Получаем токен доступа
-                const authResult = await vkBridge.send('VKWebAppGetAuthToken', {
-                    app_id: 54458532, // ID вашего приложения
-                    scope: 'groups'    // Запрашиваем доступ к группам
-                });
-                
-                console.log('Auth result:', authResult);
-                
-                // Проверяем права администратора с полученным токеном
+                // Используем API напрямую через VK Bridge с сервисным ключом
                 const result = await vkBridge.send('VKWebAppCallAPIMethod', {
                     method: 'groups.isMember',
                     params: {
                         group_id: communityId,
-                        user_id: (await vkBridge.send('VKWebAppGetUserInfo')).id,
-                        access_token: authResult.access_token,
+                        user_id: userId,
+                        access_token: SERVICE_TOKEN, // Используем сервисный ключ приложения
                         v: '5.199'
                     }
                 });
                 
-                console.log('isMember result:', result);
-                
+                console.log('Admin check result:', result);
                 return result.response && result.response.is_admin === true;
                 
             } catch (error) {
                 console.error('Error checking admin status:', error);
-                
-                // Если пользователь отклонил запрос прав - считаем что не админ
-                if (error.error_data && error.error_data.error_reason === 'User denied') {
-                    return false;
-                }
-                
-                // В случае другой ошибки - тоже false
                 return false;
             }
         }
@@ -322,7 +313,11 @@
             try {
                 showLoader();
                 
-                // Сначала пробуем получить API ключ
+                // 1. Получаем информацию о текущем пользователе
+                const userData = await vkBridge.send('VKWebAppGetUserInfo');
+                console.log('User data:', userData);
+                
+                // 2. Пытаемся получить API ключ из Google Sheets
                 const apiKey = await getApiKey(communityId);
                 console.log('API key from server:', apiKey ? 'exists' : 'not found');
                 
@@ -330,8 +325,8 @@
                     // Ключ есть - показываем виджет всем
                     loadWidget(apiKey);
                 } else {
-                    // Ключа нет - проверяем, администратор ли это
-                    const isAdmin = await checkIsAdmin(communityId);
+                    // Ключа нет - проверяем, администратор ли это (через сервисный ключ)
+                    const isAdmin = await checkIsAdmin(communityId, userData.id);
                     console.log('Is admin:', isAdmin);
                     
                     if (isAdmin) {
