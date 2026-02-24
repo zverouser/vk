@@ -106,26 +106,6 @@
             color: #666;
         }
 
-        .auth-message {
-            max-width: 400px;
-            margin: 50px auto;
-            background: #e3f2fd;
-            padding: 30px;
-            border-radius: 12px;
-            text-align: center;
-        }
-        
-        .auth-btn {
-            background: #3f8ae0;
-            color: white;
-            border: none;
-            padding: 12px 30px;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            margin-top: 15px;
-        }
-
         .debug-panel {
             position: fixed;
             bottom: 10px;
@@ -158,12 +138,6 @@
         <p>Расписание появится здесь после настройки администратором сообщества</p>
     </div>
 
-    <div id="authMessage" class="auth-message">
-        <h2>🔐 Требуется авторизация</h2>
-        <p>Для просмотра расписания нажмите кнопку "Разрешить"</p>
-        <button id="authBtn" class="auth-btn">Разрешить доступ</button>
-    </div>
-
     <div id="widget-container" class="hidden"></div>
     
     <div class="footer">
@@ -182,60 +156,30 @@
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
         const notConfiguredMessage = document.getElementById('notConfiguredMessage');
-        const authMessage = document.getElementById('authMessage');
-        const authBtn = document.getElementById('authBtn');
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
         const errorMessage = document.getElementById('errorMessage');
 
         const APP_ID = 54458532;
 
-        // ========== УНИВЕРСАЛЬНОЕ ПОЛУЧЕНИЕ ID ГРУППЫ ==========
+        // Получение ID группы
         function getCommunityId() {
-            console.log('🔍 Ищем ID группы...');
-            console.log('URL:', window.location.href);
-            
-            // Способ 1: Из параметра mid (как во второй ссылке)
+            // Из параметров URL
             const params = new URLSearchParams(window.location.search);
-            let groupId = params.get('mid');
-            if (groupId && groupId.startsWith('-')) {
-                groupId = groupId.substring(1); // Убираем минус
-                console.log('✅ ID из параметра mid:', groupId);
-                return groupId;
+            let groupId = params.get('vk_group_id');
+            
+            if (groupId) return groupId;
+            
+            // Из пути /app54458532_-229471707
+            const match = window.location.pathname.match(/\/app\d+_-(\d+)/);
+            if (match) return match[1];
+            
+            // Из параметра mid (как во второй ссылке)
+            const mid = params.get('mid');
+            if (mid && mid.startsWith('-')) {
+                return mid.substring(1);
             }
             
-            // Способ 2: Из пути (как в первой ссылке /app54458532_-229471707)
-            const pathMatch = window.location.pathname.match(/\/app\d+_-(\d+)/);
-            if (pathMatch) {
-                console.log('✅ ID из пути:', pathMatch[1]);
-                return pathMatch[1];
-            }
-            
-            // Способ 3: Из параметра vk_group_id
-            const vkGroupId = params.get('vk_group_id');
-            if (vkGroupId) {
-                console.log('✅ ID из vk_group_id:', vkGroupId);
-                return vkGroupId;
-            }
-            
-            // Способ 4: Из параметра group_id
-            const groupIdParam = params.get('group_id');
-            if (groupIdParam) {
-                console.log('✅ ID из group_id:', groupIdParam);
-                return groupIdParam;
-            }
-            
-            // Способ 5: Из ссылки на группу в параметре ref
-            const ref = params.get('ref');
-            if (ref && ref.includes('-')) {
-                const refMatch = ref.match(/-(\d+)/);
-                if (refMatch) {
-                    console.log('✅ ID из ref:', refMatch[1]);
-                    return refMatch[1];
-                }
-            }
-            
-            console.log('❌ ID группы не найден');
             return null;
         }
 
@@ -245,13 +189,7 @@
             const role = params.get('vk_viewer_group_role');
             const fromAdmin = params.get('from_admin');
             
-            // Если есть параметр from_admin=1, значит это администратор
-            if (fromAdmin === '1') {
-                console.log('✅ from_admin=1, пользователь админ');
-                return true;
-            }
-            
-            return role === 'admin' || role === 'editor';
+            return role === 'admin' || role === 'editor' || fromAdmin === '1';
         }
 
         // Загрузка виджета
@@ -274,59 +212,59 @@
             widgetContainer.classList.remove('hidden');
             setupPanel.classList.add('hidden');
             notConfiguredMessage.classList.add('hidden');
-            authMessage.classList.add('hidden');
             loading.classList.add('hidden');
         }
 
-        // Авторизация пользователя
-        async function authorizeUser() {
-            try {
-                const result = await vkBridge.send('VKWebAppGetAuthToken', {
-                    app_id: APP_ID,
-                    scope: 'storage'
-                });
-                return !!result.access_token;
-            } catch (error) {
-                console.log('Ошибка авторизации:', error);
-                return false;
-            }
-        }
-
-        // Получение ключа
+        // Получение ключа (сначала из VK Storage, потом из localStorage)
         async function getApiKey() {
             const communityId = getCommunityId();
             if (!communityId) return null;
             
+            // Сначала пробуем localStorage (это работает для всех!)
+            const localKey = localStorage.getItem('fit_api_key_' + communityId);
+            if (localKey) {
+                console.log('✅ Ключ найден в localStorage');
+                return localKey;
+            }
+            
+            // Если нет в localStorage, пробуем VK Storage
             try {
                 const result = await vkBridge.send('VKWebAppStorageGet', {
                     keys: ['api_key_' + communityId]
                 });
                 
                 if (result.keys && result.keys[0] && result.keys[0].value) {
+                    // Сохраняем в localStorage для будущих заходов
+                    localStorage.setItem('fit_api_key_' + communityId, result.keys[0].value);
                     return result.keys[0].value;
                 }
-                return null;
             } catch (error) {
-                console.log('Ошибка доступа к хранилищу:', error);
-                return 'NEED_AUTH';
+                console.log('VK Storage недоступен:', error);
             }
+            
+            return null;
         }
 
-        // Сохранение ключа
+        // Сохранение ключа (в оба хранилища)
         async function saveApiKey(apiKey) {
             const communityId = getCommunityId();
             if (!communityId) return false;
             
+            // Всегда сохраняем в localStorage
+            localStorage.setItem('fit_api_key_' + communityId, apiKey);
+            
+            // Пытаемся сохранить в VK Storage (для администратора)
             try {
                 await vkBridge.send('VKWebAppStorageSet', {
                     key: 'api_key_' + communityId,
                     value: apiKey
                 });
-                return true;
+                console.log('✅ Ключ сохранен в VK Storage');
             } catch (error) {
-                console.error('Ошибка сохранения:', error);
-                return false;
+                console.log('VK Storage недоступен для сохранения:', error);
             }
+            
+            return true;
         }
 
         // Основная логика
@@ -334,64 +272,29 @@
             console.log('🚀 Запуск приложения');
             
             const communityId = getCommunityId();
-            console.log('🏢 Определен ID группы:', communityId);
+            console.log('🏢 ID группы:', communityId);
             
             if (!communityId) {
                 loading.classList.add('hidden');
-                notConfiguredMessage.querySelector('p').textContent = 'Ошибка определения сообщества. Нажмите "Отладка" для диагностики.';
+                notConfiguredMessage.querySelector('p').textContent = 'Ошибка определения сообщества';
                 notConfiguredMessage.classList.remove('hidden');
                 return;
             }
             
-            // Проверяем, есть ли ключ в хранилище
+            // Проверяем ключ
             const savedKey = await getApiKey();
-            console.log('🔑 Результат получения ключа:', savedKey);
+            console.log('🔑 Ключ:', savedKey ? 'найден' : 'не найден');
             
-            if (savedKey && savedKey !== 'NEED_AUTH') {
-                // Ключ есть - показываем расписание
+            if (savedKey) {
                 loadWidget(savedKey);
-            } else if (savedKey === 'NEED_AUTH') {
-                // Нужна авторизация - показываем кнопку
-                loading.classList.add('hidden');
-                authMessage.classList.remove('hidden');
             } else if (isAdmin()) {
-                // Ключа нет, пользователь админ - показываем ввод ключа
                 loading.classList.add('hidden');
                 setupPanel.classList.remove('hidden');
             } else {
-                // Ключа нет, пользователь не админ
                 loading.classList.add('hidden');
                 notConfiguredMessage.classList.remove('hidden');
             }
         })();
-
-        // Кнопка авторизации
-        authBtn.addEventListener('click', async () => {
-            authBtn.disabled = true;
-            authBtn.textContent = 'Авторизация...';
-            
-            const authorized = await authorizeUser();
-            
-            if (authorized) {
-                // После авторизации пробуем получить ключ
-                const savedKey = await getApiKey();
-                if (savedKey && savedKey !== 'NEED_AUTH') {
-                    loadWidget(savedKey);
-                } else {
-                    // Если ключа нет
-                    if (isAdmin()) {
-                        setupPanel.classList.remove('hidden');
-                        authMessage.classList.add('hidden');
-                    } else {
-                        notConfiguredMessage.classList.remove('hidden');
-                        authMessage.classList.add('hidden');
-                    }
-                }
-            } else {
-                authBtn.disabled = false;
-                authBtn.textContent = 'Разрешить доступ';
-            }
-        });
 
         // Сохранение ключа админом
         saveBtn.addEventListener('click', async () => {
@@ -423,31 +326,24 @@
             if (e.key === 'Enter') saveBtn.click();
         });
 
-        // Отладочные функции
+        // Отладка
         window.forceDebug = function() {
-            console.log('=== ОТЛАДОЧНАЯ ИНФОРМАЦИЯ ===');
-            console.log('URL:', window.location.href);
-            console.log('Pathname:', window.location.pathname);
-            console.log('Search:', window.location.search);
-            
-            const params = new URLSearchParams(window.location.search);
-            console.log('Параметры:');
-            for (let [key, value] of params) {
-                console.log(`  ${key}: ${value}`);
-            }
-            
             const communityId = getCommunityId();
-            console.log('Определенный ID группы:', communityId);
+            const localKey = localStorage.getItem('fit_api_key_' + communityId);
             
-            alert(`ID группы: ${communityId || 'не найден'}\n\nПосмотрите консоль (F12) для деталей`);
+            console.log('=== ОТЛАДКА ===');
+            console.log('ID группы:', communityId);
+            console.log('Ключ в localStorage:', localKey);
+            console.log('URL:', window.location.href);
+            console.log('Параметры:', window.location.search);
+            
+            alert(`ID группы: ${communityId}\nКлюч: ${localKey ? 'есть' : 'нет'}`);
         };
 
         window.forceSetup = function() {
             loading.classList.add('hidden');
             setupPanel.classList.remove('hidden');
             notConfiguredMessage.classList.add('hidden');
-            authMessage.classList.add('hidden');
-            console.log('✅ Панель ввода принудительно показана');
         };
     </script>
 </body>
