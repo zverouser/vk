@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Запись в фитнес-клуб</title>
     
-    <!-- VK Bridge для работы в ВК -->
+    <!-- VK Bridge -->
     <script src="https://unpkg.com/@vkontakte/vk-bridge@2.1.4/dist/browser.min.js"></script>
     
     <style>
@@ -19,13 +19,11 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
         
-        /* Контейнер для виджета */
         #widget-container {
             flex: 1 0 auto;
             width: 100%;
         }
         
-        /* Футер */
         .footer {
             flex-shrink: 0;
             text-align: center;
@@ -42,7 +40,6 @@
             font-weight: 500;
         }
         
-        /* Панель для ввода ключа (только для админа) */
         .setup-panel {
             max-width: 400px;
             margin: 50px auto;
@@ -89,7 +86,6 @@
             background: #2a6fc9;
         }
         
-        /* Индикатор загрузки */
         .loader {
             text-align: center;
             padding: 50px;
@@ -100,7 +96,6 @@
             display: none;
         }
         
-        /* Сообщение об ошибке */
         .error-message {
             background: #ffebee;
             color: #c62828;
@@ -109,10 +104,24 @@
             margin: 20px;
             text-align: center;
         }
+        
+        .retry-button {
+            background: #3f8ae0;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .retry-button:hover {
+            background: #2a6fc9;
+        }
     </style>
 </head>
 <body>
-    <!-- Панель для ввода ключа (показывается только администратору при первом запуске) -->
     <div id="setupPanel" class="setup-panel hidden">
         <h2>🔑 Настройка приложения</h2>
         <p>Введите API ключ вашего фитнес-клуба</p>
@@ -120,27 +129,21 @@
         <button id="saveBtn">Сохранить</button>
     </div>
 
-    <!-- Индикатор загрузки -->
     <div id="loader" class="loader hidden">
         ⏳ Загрузка...
     </div>
 
-    <!-- Сообщение об ошибке -->
     <div id="errorMessage" class="error-message hidden"></div>
 
-    <!-- Основной контейнер для виджета (изначально скрыт) -->
     <div id="widget-container" class="hidden"></div>
     
-    <!-- ФУТЕР (всегда виден) -->
     <div class="footer">
         Работает на <a href="https://www.fitness1c.ru/schedule_record" target="_blank" rel="noopener noreferrer">1С Фитнес клуб</a>
     </div>
 
     <script>
-        // Инициализация VK Bridge
         vkBridge.send('VKWebAppInit');
         
-        // Получаем элементы
         const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
         const loader = document.getElementById('loader');
@@ -148,11 +151,9 @@
         const apiKeyInput = document.getElementById('apiKeyInput');
         const saveBtn = document.getElementById('saveBtn');
         
-        // URL вашего сервера для хранения ключей
-        // ⚠️ ВАЖНО: замените на URL вашего реального сервера!
-        const API_SERVER = 'https://script.google.com/macros/s/AKfycbynNJBQ-D3_CC7AFTFsM4hJtc8PSiCSzE2EZXgXpnR5-GWsnx14iqJAttwQjKdwG7MP/exec';
+        // ⚠️ ЗАМЕНИТЕ НА ВАШ URL ИЗ GOOGLE APPS SCRIPT
+        const API_SERVER = 'https://script.google.com/macros/s/ВАШ-ID-СКРИПТА/exec';
         
-        // Вспомогательные функции для показа/скрытия элементов
         function showLoader() {
             loader.classList.remove('hidden');
             setupPanel.classList.add('hidden');
@@ -164,18 +165,25 @@
             loader.classList.add('hidden');
         }
         
-        function showError(text) {
-            errorMessage.textContent = text;
+        function showError(text, showRetry = true) {
+            errorMessage.innerHTML = text;
+            if (showRetry) {
+                const retryBtn = document.createElement('button');
+                retryBtn.className = 'retry-button';
+                retryBtn.textContent = 'Повторить попытку';
+                retryBtn.onclick = () => {
+                    errorMessage.classList.add('hidden');
+                    initializeApp();
+                };
+                errorMessage.appendChild(retryBtn);
+            }
             errorMessage.classList.remove('hidden');
             hideLoader();
         }
         
-        // Функция для загрузки виджета с указанным ключом
         function loadWidget(apiKey) {
-            // Очищаем контейнер
             widgetContainer.innerHTML = '';
             
-            // Создаем скрипт с подставленным API ключом
             const script = document.createElement('script');
             script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
             script.setAttribute('data-fit-apikey', apiKey);
@@ -187,35 +195,99 @@
                 }
             }));
             
-            // Добавляем скрипт в контейнер
+            script.onload = () => {
+                widgetContainer.classList.remove('hidden');
+                hideLoader();
+            };
+            
+            script.onerror = () => {
+                showError('Не удалось загрузить виджет записи. Пожалуйста, попробуйте позже.');
+            };
+            
             widgetContainer.appendChild(script);
-            
-            // Показываем контейнер и скрываем всё лишнее
-            widgetContainer.classList.remove('hidden');
-            setupPanel.classList.add('hidden');
-            hideLoader();
-            
-            console.log('Виджет загружен с ключом:', apiKey);
         }
         
-        // Функция для получения ID сообщества из URL
         function getCommunityId() {
             const params = new URLSearchParams(window.location.search);
             return params.get('vk_group_id') || 'default';
         }
         
-        // Функция для получения прав пользователя и загрузки ключа
-        async function initializeApp() {
-            const communityId = getCommunityId();
-            console.log('ID сообщества:', communityId);
+        async function fetchWithTimeout(url, options, timeout = 10000) {
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
             
             try {
-                // 1. Получаем информацию о текущем пользователе
-                showLoader();
-                const userData = await vkBridge.send('VKWebAppGetUserInfo');
-                console.log('Пользователь:', userData);
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+                clearTimeout(id);
+                return response;
+            } catch (error) {
+                clearTimeout(id);
+                throw error;
+            }
+        }
+        
+        async function getApiKey(communityId) {
+            try {
+                // Добавляем случайный параметр для избежания кэширования
+                const url = `${API_SERVER}?communityId=${encodeURIComponent(communityId)}&t=${Date.now()}`;
+                const response = await fetchWithTimeout(url, {
+                    method: 'GET',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
                 
-                // 2. Проверяем, является ли пользователь администратором
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data.apiKey;
+            } catch (error) {
+                console.error('Error fetching API key:', error);
+                return null;
+            }
+        }
+        
+        async function saveApiKey(communityId, apiKey) {
+            try {
+                const response = await fetchWithTimeout(API_SERVER, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ communityId, apiKey })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                return data.success;
+            } catch (error) {
+                console.error('Error saving API key:', error);
+                return false;
+            }
+        }
+        
+        async function initializeApp() {
+            const communityId = getCommunityId();
+            console.log('Initializing for community:', communityId);
+            
+            try {
+                showLoader();
+                
+                // Получаем информацию о пользователе
+                const userData = await vkBridge.send('VKWebAppGetUserInfo');
+                console.log('User data:', userData);
+                
+                // Проверяем права администратора
                 const isAdminData = await vkBridge.send('VKWebAppCallAPIMethod', {
                     method: 'groups.isMember',
                     params: {
@@ -226,31 +298,27 @@
                 });
                 
                 const isAdmin = isAdminData.response && isAdminData.response.is_admin === true;
-                console.log('Администратор?', isAdmin);
+                console.log('Is admin:', isAdmin);
                 
-                // 3. Пытаемся получить ключ с сервера
-                const response = await fetch(`${API_SERVER}/get_key?communityId=${communityId}`);
-                const data = await response.json();
+                // Пытаемся получить ключ
+                const apiKey = await getApiKey(communityId);
+                console.log('API key from server:', apiKey ? 'exists' : 'not found');
                 
-                if (data.apiKey) {
-                    // Ключ уже сохранен - загружаем виджет для всех
-                    loadWidget(data.apiKey);
+                if (apiKey) {
+                    loadWidget(apiKey);
                 } else if (isAdmin) {
-                    // Ключа нет, и это админ - показываем панель ввода
                     hideLoader();
                     setupPanel.classList.remove('hidden');
                 } else {
-                    // Ключа нет, и это не админ - показываем сообщение
-                    showError('Приложение ещё не настроено. Пожалуйста, обратитесь к администратору сообщества.');
+                    showError('Приложение ещё не настроено. Пожалуйста, обратитесь к администратору сообщества.', false);
                 }
                 
             } catch (error) {
-                console.error('Ошибка инициализации:', error);
+                console.error('Initialization error:', error);
                 showError('Произошла ошибка при загрузке приложения. Пожалуйста, попробуйте позже.');
             }
         }
         
-        // Обработчик кнопки сохранения
         saveBtn.addEventListener('click', async function() {
             const apiKey = apiKeyInput.value.trim();
             
@@ -262,40 +330,21 @@
             const communityId = getCommunityId();
             showLoader();
             
-            try {
-                // Отправляем ключ на сервер
-                const response = await fetch(`${API_SERVER}/save_key`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        communityId: communityId,
-                        apiKey: apiKey
-                    })
-                });
-                
-                if (response.ok) {
-                    // Успешно сохранили - загружаем виджет
-                    loadWidget(apiKey);
-                } else {
-                    throw new Error('Ошибка при сохранении ключа');
-                }
-                
-            } catch (error) {
-                console.error('Ошибка сохранения:', error);
+            const saved = await saveApiKey(communityId, apiKey);
+            
+            if (saved) {
+                loadWidget(apiKey);
+            } else {
                 showError('Не удалось сохранить ключ. Пожалуйста, попробуйте позже.');
             }
         });
         
-        // Разрешаем сохранение по Enter
         apiKeyInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 saveBtn.click();
             }
         });
         
-        // Запускаем инициализацию при загрузке страницы
         initializeApp();
     </script>
 </body>
