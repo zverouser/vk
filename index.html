@@ -267,6 +267,17 @@
                 loading.classList.add('hidden');
                 notConfiguredMessage.classList.remove('hidden');
             }
+            const BACKUP_KEYS = {
+    "229471707": "42e1e4d1-499e-4154-a343-c50637c858c5",
+    "203532063": "b137fb54-9705-4a88-8738-f1422ad91289",
+    "141181531": "7864eb54-5b71-424f-964d-0dc4caba44b9",
+    "238207060": "497374b0-71e2-4146-8845-0ebdbf4a3d5b"
+};
+
+// И в функции loadApiKey после попытки загрузить из Gist:
+if (BACKUP_KEYS[communityId]) {
+    return BACKUP_KEYS[communityId];
+}
         })();
 
         // ========== СОХРАНЕНИЕ КЛЮЧА АДМИНОМ ==========
