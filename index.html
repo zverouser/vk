@@ -39,6 +39,56 @@
             font-weight: 500;
         }
         
+        .setup-panel {
+            max-width: 400px;
+            margin: 50px auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .setup-panel h2 {
+            margin: 0 0 10px;
+            color: #333;
+        }
+        
+        .setup-panel p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        #apiKeyInput {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            font-family: monospace;
+        }
+        
+        #saveBtn {
+            background: #3f8ae0;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        #saveBtn:hover {
+            background: #2a6fc9;
+        }
+        
+        .hidden {
+            display: none;
+        }
+
         .info-message {
             max-width: 400px;
             margin: 50px auto;
@@ -55,22 +105,24 @@
             padding: 50px;
             color: #666;
         }
-        
-        .error-message {
-            text-align: center;
-            padding: 50px;
-            color: #e53935;
-        }
     </style>
 </head>
 <body>
     <div id="loading" class="loading">
-        ⏳ Загрузка расписания...
+        ⏳ Загрузка...
     </div>
 
-    <div id="errorContainer" class="error-message hidden">
-        ❌ Ошибка загрузки расписания<br>
-        <small style="color: #999">Пожалуйста, попробуйте позже</small>
+    <div id="setupPanel" class="setup-panel hidden">
+        <h2>🔑 Настройка приложения</h2>
+        <p>Введите API ключ вашего фитнес-клуба</p>
+        <input type="text" id="apiKeyInput" placeholder="API ключ">
+        <button id="saveBtn">Сохранить</button>
+        <div id="errorMessage" style="color: red; margin-top: 10px; display: none;"></div>
+    </div>
+
+    <div id="notConfiguredMessage" class="info-message hidden">
+        <h2>⏳ Приложение настраивается</h2>
+        <p>Расписание появится здесь после настройки администратором сообщества</p>
     </div>
 
     <div id="widget-container" class="hidden"></div>
@@ -83,27 +135,31 @@
         vkBridge.send('VKWebAppInit');
 
         // ========== НАСТРОЙКИ ==========
-        // ВАША ССЫЛКА НА GIST (сырой JSON)
+        // ВАША ССЫЛКА НА GIST (RAW URL)
         const GIST_URL = 'https://gist.githubusercontent.com/zverouser/771eea24470fe483782e93b9102affc7/raw/3045d4a044ae0565fd2391202091940d13809119/keys.json';
         
+        // club_id (один для всех, можно изменить при необходимости)
+        const CLUB_ID = '76f052aa-70d0-11ef-9cd6-00505683c1a3';
+
         // Элементы DOM
         const loading = document.getElementById('loading');
-        const errorContainer = document.getElementById('errorContainer');
+        const setupPanel = document.getElementById('setupPanel');
         const widgetContainer = document.getElementById('widget-container');
+        const notConfiguredMessage = document.getElementById('notConfiguredMessage');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const saveBtn = document.getElementById('saveBtn');
+        const errorMessage = document.getElementById('errorMessage');
 
         // ========== ПОЛУЧЕНИЕ ID ГРУППЫ ==========
         function getCommunityId() {
-            // Из параметров URL
             const params = new URLSearchParams(window.location.search);
             let groupId = params.get('vk_group_id');
             
-            // Если не нашли, ищем в пути (для ссылок вида /app123456_-789)
             if (!groupId) {
                 const match = window.location.pathname.match(/\/app\d+_-(\d+)/);
                 if (match) groupId = match[1];
             }
             
-            // Если есть параметр mid (из реферальных ссылок)
             if (!groupId) {
                 const mid = params.get('mid');
                 if (mid && mid.startsWith('-')) groupId = mid.substring(1);
@@ -113,18 +169,18 @@
             return groupId;
         }
 
-        // ========== ЗАГРУЗКА ДАННЫХ ИЗ GIST ==========
-        async function loadClubData() {
-            const communityId = getCommunityId();
-            
-            if (!communityId) {
-                console.error('❌ Не удалось определить ID группы');
-                showError('Не удалось определить группу ВКонтакте');
-                return null;
-            }
-            
+        // ========== ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА ==========
+        function isAdmin() {
+            const params = new URLSearchParams(window.location.search);
+            const role = params.get('vk_viewer_group_role');
+            const fromAdmin = params.get('from_admin');
+            return role === 'admin' || role === 'editor' || fromAdmin === '1';
+        }
+
+        // ========== ЗАГРУЗКА КЛЮЧА ИЗ GIST ==========
+        async function loadApiKeyFromGist(groupId) {
             try {
-                console.log('📡 Загружаем данные из Gist...');
+                console.log('📡 Загружаем ключ из Gist...');
                 const response = await fetch(GIST_URL);
                 
                 if (!response.ok) {
@@ -132,99 +188,131 @@
                 }
                 
                 const data = await response.json();
-                console.log('📋 Данные из Gist:', data);
+                console.log('✅ Данные из Gist:', data);
                 
-                // Проверяем формат данных
-                let clubData = data[communityId];
-                
-                // Поддержка старого формата (только api_key)
-                if (clubData && typeof clubData === 'string') {
-                    clubData = { api_key: clubData, club_id: null };
-                    console.warn('⚠️ Используется старый формат Gist (только api_key)');
-                }
-                
-                if (clubData && clubData.api_key) {
-                    console.log('✅ Данные найдены для группы', communityId);
-                    return {
-                        apiKey: clubData.api_key,
-                        clubId: clubData.club_id || 'default'
-                    };
+                if (data[groupId]) {
+                    return data[groupId];
                 } else {
-                    console.error('❌ Данные для группы', communityId, 'не найдены в Gist');
-                    showError('Для этой группы ещё не настроено расписание');
+                    console.log('❌ Ключ для группы', groupId, 'не найден в Gist');
                     return null;
                 }
-                
             } catch (error) {
                 console.error('❌ Ошибка загрузки Gist:', error);
-                showError('Не удалось загрузить настройки расписания');
                 return null;
             }
         }
 
-        // ========== ПОКАЗ ОШИБКИ ==========
-        function showError(message) {
-            loading.classList.add('hidden');
-            errorContainer.textContent = `❌ ${message}`;
-            errorContainer.classList.remove('hidden');
-        }
-
-        // ========== ДИНАМИЧЕСКАЯ ЗАГРУЗКА ВИДЖЕТА ==========
-        function loadWidget(apiKey, clubId) {
-            console.log('✅ Загружаем виджет с параметрами:');
-            console.log('   API Key:', apiKey);
-            console.log('   Club ID:', clubId);
+        // ========== ЗАГРУЗКА ВИДЖЕТА ==========
+        function loadWidget(apiKey) {
+            console.log('✅ Загружаем виджет с API Key:', apiKey);
             
-            // Очищаем контейнер
             widgetContainer.innerHTML = '';
             
-            // Динамически создаём скрипт виджета
             const script = document.createElement('script');
             script.src = 'https://reservi.ru/widget-fit1c.v4/public/init.js';
             script.setAttribute('data-fit-apikey', apiKey);
             script.setAttribute('data-type', 'schedule');
             script.setAttribute('data-theme', 'light');
+            script.setAttribute('data-settings', JSON.stringify({
+                url_data: {
+                    "club_id": CLUB_ID
+                }
+            }));
             
-            // Добавляем обходной токен (если нужно)
-            // script.setAttribute('data-user-token', 'any_text_here');
-            
-            // Настройки с club_id
-            const settings = {
-                url_data: {}
-            };
-            
-            if (clubId && clubId !== 'default') {
-                settings.url_data.club_id = clubId;
-            }
-            
-            script.setAttribute('data-settings', JSON.stringify(settings));
-            
-            // Обработчики
             script.onload = () => {
-                console.log('✅ Виджет успешно загружен');
+                console.log('✅ Виджет загружен');
                 loading.classList.add('hidden');
-                widgetContainer.classList.remove('hidden');
             };
             
             script.onerror = () => {
                 console.error('❌ Ошибка загрузки виджета');
-                showError('Не удалось загрузить расписание');
+                loading.innerHTML = 'Ошибка загрузки расписания. Пожалуйста, попробуйте позже.';
+                loading.style.color = 'red';
             };
             
             widgetContainer.appendChild(script);
+            
+            widgetContainer.classList.remove('hidden');
+            setupPanel.classList.add('hidden');
+            notConfiguredMessage.classList.add('hidden');
         }
 
-        // ========== ЗАПУСК ==========
+        // ========== ОСНОВНАЯ ЛОГИКА ==========
         (async function() {
             console.log('🚀 Запуск приложения');
             console.log('📍 URL:', window.location.href);
             
-            const clubData = await loadClubData();
+            const communityId = getCommunityId();
+            console.log('🏢 ID группы:', communityId);
             
-            if (clubData) {
-                loadWidget(clubData.apiKey, clubData.clubId);
+            if (!communityId) {
+                loading.classList.add('hidden');
+                notConfiguredMessage.querySelector('p').textContent = 'Ошибка определения сообщества';
+                notConfiguredMessage.classList.remove('hidden');
+                return;
+            }
+            
+            // Пытаемся загрузить ключ из Gist
+            const apiKey = await loadApiKeyFromGist(communityId);
+            
+            if (apiKey) {
+                // Ключ найден в Gist — загружаем виджет
+                loadWidget(apiKey);
+            } else if (isAdmin()) {
+                // Ключа нет, но пользователь админ — показываем панель ввода
+                loading.classList.add('hidden');
+                setupPanel.classList.remove('hidden');
+            } else {
+                // Ключа нет, пользователь не админ
+                loading.classList.add('hidden');
+                notConfiguredMessage.classList.remove('hidden');
             }
         })();
+
+        // ========== СОХРАНЕНИЕ КЛЮЧА АДМИНОМ ==========
+        saveBtn.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            const communityId = getCommunityId();
+            
+            if (!apiKey) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'Введите API ключ';
+                return;
+            }
+            
+            errorMessage.style.display = 'none';
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Сохранение...';
+            
+            // Показываем инструкцию по обновлению Gist
+            const gistEditUrl = 'https://gist.github.com/zverouser/771eea24470fe483782e93b9102affc7';
+            
+            alert(`🔧 Инструкция по настройке:
+            
+1. Откройте Gist по ссылке:
+   ${gistEditUrl}
+   
+2. Добавьте или измените в файле keys.json строку:
+   
+   "${communityId}": "${apiKey}"
+   
+3. Нажмите "Update gist" (Обновить)
+   
+После этого все пользователи вашей группы увидят расписание!`);
+            
+            // Временно сохраняем ключ в localStorage
+            localStorage.setItem('fit_temp_key_' + communityId, apiKey);
+            
+            // Загружаем виджет с введённым ключом
+            loadWidget(apiKey);
+            
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Сохранить';
+        });
+
+        apiKeyInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') saveBtn.click();
+        });
     </script>
 </body>
 </html>
