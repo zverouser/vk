@@ -136,10 +136,18 @@
 
         // ========== НАСТРОЙКИ ==========
         // ВАША ССЫЛКА НА GIST (RAW URL)
-        const GIST_URL = 'https://gist.githubusercontent.com/zverouser/771eea24470fe483782e93b9102affc7/raw/cd0b35e1f84417daacc8439d5a02e19b11a4433d/keys.json';
+        const GIST_URL = 'https://gist.githubusercontent.com/zverouser/771eea24470fe483782e93b9102affc7/raw/3045d4a044ae0565fd2391202091940d13809119/keys.json';
         
-        // club_id (один для всех, можно изменить при необходимости)
+        // club_id (один для всех, при необходимости можно менять)
         const CLUB_ID = '76f052aa-70d0-11ef-9cd6-00505683c1a3';
+
+        // ========== РЕЗЕРВНЫЕ КЛЮЧИ (НА СЛУЧАЙ, ЕСЛИ GIST НЕДОСТУПЕН) ==========
+        const BACKUP_KEYS = {
+            "229471707": "42e1e4d1-499e-4154-a343-c50637c858c5",
+            "203532063": "b137fb54-9705-4a88-8738-f1422ad91289",
+            "141181531": "7864eb54-5b71-424f-964d-0dc4caba44b9",
+            "238207060": "497374b0-71e2-4146-8845-0ebdbf4a3d5b"
+        };
 
         // Элементы DOM
         const loading = document.getElementById('loading');
@@ -202,6 +210,20 @@
             }
         }
 
+        // ========== ЗАГРУЗКА КЛЮЧА (С РЕЗЕРВОМ) ==========
+        async function loadApiKey(groupId) {
+            // 1. Сначала пробуем загрузить из Gist
+            let apiKey = await loadApiKeyFromGist(groupId);
+            
+            // 2. Если Gist не дал ключ, используем резервный
+            if (!apiKey && BACKUP_KEYS[groupId]) {
+                console.log('⚠️ Используем резервный ключ для группы', groupId);
+                apiKey = BACKUP_KEYS[groupId];
+            }
+            
+            return apiKey;
+        }
+
         // ========== ЗАГРУЗКА ВИДЖЕТА ==========
         function loadWidget(apiKey) {
             console.log('✅ Загружаем виджет с API Key:', apiKey);
@@ -219,9 +241,13 @@
                 }
             }));
             
+            // Обходной токен (раскомментировать если нужен)
+            // script.setAttribute('data-user-token', 'any_text_here');
+            
             script.onload = () => {
                 console.log('✅ Виджет загружен');
                 loading.classList.add('hidden');
+                widgetContainer.classList.remove('hidden');
             };
             
             script.onerror = () => {
@@ -252,11 +278,11 @@
                 return;
             }
             
-            // Пытаемся загрузить ключ из Gist
-            const apiKey = await loadApiKeyFromGist(communityId);
+            // Загружаем ключ (сначала Gist, потом резерв)
+            const apiKey = await loadApiKey(communityId);
             
             if (apiKey) {
-                // Ключ найден в Gist — загружаем виджет
+                // Ключ найден — загружаем виджет
                 loadWidget(apiKey);
             } else if (isAdmin()) {
                 // Ключа нет, но пользователь админ — показываем панель ввода
@@ -267,17 +293,6 @@
                 loading.classList.add('hidden');
                 notConfiguredMessage.classList.remove('hidden');
             }
-            const BACKUP_KEYS = {
-    "229471707": "42e1e4d1-499e-4154-a343-c50637c858c5",
-    "203532063": "b137fb54-9705-4a88-8738-f1422ad91289",
-    "141181531": "7864eb54-5b71-424f-964d-0dc4caba44b9",
-    "238207060": "497374b0-71e2-4146-8845-0ebdbf4a3d5b"
-};
-
-// И в функции loadApiKey после попытки загрузить из Gist:
-if (BACKUP_KEYS[communityId]) {
-    return BACKUP_KEYS[communityId];
-}
         })();
 
         // ========== СОХРАНЕНИЕ КЛЮЧА АДМИНОМ ==========
@@ -310,9 +325,6 @@ if (BACKUP_KEYS[communityId]) {
 3. Нажмите "Update gist" (Обновить)
    
 После этого все пользователи вашей группы увидят расписание!`);
-            
-            // Временно сохраняем ключ в localStorage
-            localStorage.setItem('fit_temp_key_' + communityId, apiKey);
             
             // Загружаем виджет с введённым ключом
             loadWidget(apiKey);
